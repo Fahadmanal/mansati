@@ -96,7 +96,7 @@
   const classId = parseInt(params.get('id'), 10);
   const classes = JSON.parse(localStorage.getItem('classes') || '[]');
   const cls     = classes.find(c => Number(c.id) === classId);
-  if (!cls) window.location.href = 'classes.html';
+  if (!cls || Number(cls.teacherId || 1) !== Number(teacher.id || 1)) window.location.href = 'classes.html';
 
   document.getElementById('class-title').textContent = cls.name;
   document.getElementById('class-name-bc').textContent = cls.name;

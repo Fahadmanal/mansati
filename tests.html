@@ -179,7 +179,7 @@ async function saveTest(active = true) {
 
   const tests = JSON.parse(localStorage.getItem('tests') || '[]');
   const newTest = {
-    id: Date.now(),
+    id: generateEntityId(),
     title,
     type,
     classId,

@@ -80,7 +80,7 @@ function register() {
     return;
   }
 
-  const id = Date.now();
+  const id = (typeof generateEntityId === 'function') ? generateEntityId() : (Date.now() * 1000 + Math.floor(Math.random() * 1000));
   const teacher = {
     id,
     name,

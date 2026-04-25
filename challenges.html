@@ -94,8 +94,9 @@ document.getElementById('sidebar-container').innerHTML=getSidebar('challenges');
 
 function load(){
   const classes=JSON.parse(localStorage.getItem('classes')||'[]').filter(c=>c.teacherId===(teacher.id||1));
-  const tests=JSON.parse(localStorage.getItem('tests')||'[]');
-  const results=JSON.parse(localStorage.getItem('results')||'[]');
+  const classIds = new Set(classes.map(c => Number(c.id)));
+  const tests=JSON.parse(localStorage.getItem('tests')||'[]').filter(t=>classIds.has(Number(t.classId)));
+  const results=JSON.parse(localStorage.getItem('results')||'[]').filter(r=>classIds.has(Number(r.classId)));
 
   const challenges=tests.filter(t=>t.type==='challenge'&&classes.find(c=>c.id===t.classId));
   const cResults=results.filter(r=>r.type==='challenge');

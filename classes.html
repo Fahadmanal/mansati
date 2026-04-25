@@ -150,7 +150,7 @@ async function addClass() {
   if (!name || !code) { showAlert('modal-alert', 'أدخل اسم الفصل والكود', 'error'); return; }
   const classes = JSON.parse(localStorage.getItem('classes') || '[]');
   if (classes.find(c => c.code === code)) { showAlert('modal-alert', 'هذا الكود مستخدم مسبقاً', 'error'); return; }
-  classes.push({ id: Date.now(), name, subject, code, studentCount: 0, teacherId: teacher.id || 1, createdAt: new Date().toISOString() });
+  classes.push({ id: generateEntityId(), name, subject, code, studentCount: 0, teacherId: teacher.id || 1, createdAt: new Date().toISOString() });
   localStorage.setItem('classes', JSON.stringify(classes));
   if (window.cloudDB?.isEnabled()) {
     try { await cloudDB.upsertClass(classes[classes.length - 1]); } catch (e) { console.warn('Cloud class save failed:', e.message); }

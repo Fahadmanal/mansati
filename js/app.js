@@ -73,6 +73,20 @@ function generateCode() {
   return Array.from({length:6}, ()=>c[Math.floor(Math.random()*c.length)]).join('');
 }
 
+function generateEntityId() {
+  // Millisecond timestamp + random tail to reduce cross-device collisions.
+  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
+}
+
+function getTeacherClassIds(teacherId) {
+  const tid = Number(teacherId || 1);
+  return new Set(
+    JSON.parse(localStorage.getItem('classes') || '[]')
+      .filter(c => Number(c.teacherId || 1) === tid)
+      .map(c => Number(c.id))
+  );
+}
+
 function copyToClipboard(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
     const orig = btn.textContent;

@@ -81,8 +81,9 @@ let allResults=[],allClasses=[],allTests=[];
 
 function load(){
   allClasses=JSON.parse(localStorage.getItem('classes')||'[]').filter(c=>c.teacherId===(teacher.id||1));
-  allTests=JSON.parse(localStorage.getItem('tests')||'[]');
-  allResults=JSON.parse(localStorage.getItem('results')||'[]');
+  const classIds = new Set(allClasses.map(c => Number(c.id)));
+  allTests=JSON.parse(localStorage.getItem('tests')||'[]').filter(t=>classIds.has(Number(t.classId)));
+  allResults=JSON.parse(localStorage.getItem('results')||'[]').filter(r=>classIds.has(Number(r.classId)));
 
   const sel=document.getElementById('filter-class');
   const existing=[...sel.options].map(o=>o.value);

@@ -125,8 +125,9 @@ document.getElementById('teacher-sub').textContent = `${teacher.subject||''} | $
 
 function load() {
   const classes = JSON.parse(localStorage.getItem('classes')||'[]').filter(c=>c.teacherId===(teacher.id||1));
-  const tests   = JSON.parse(localStorage.getItem('tests')||'[]');
-  const results = JSON.parse(localStorage.getItem('results')||'[]');
+  const classIds = new Set(classes.map(c => Number(c.id)));
+  const tests   = JSON.parse(localStorage.getItem('tests')||'[]').filter(t => classIds.has(Number(t.classId)));
+  const results = JSON.parse(localStorage.getItem('results')||'[]').filter(r => classIds.has(Number(r.classId)));
   const students= JSON.parse(localStorage.getItem('students')||'[]');
 
   const totalStudents = classes.reduce((s,c)=>s+(c.studentCount||0),0);
@@ -200,7 +201,7 @@ function addClass(){
   if(!name||!code){showAlert('modal-alert','أدخل الاسم والكود على الأقل','error');return}
   const classes=JSON.parse(localStorage.getItem('classes')||'[]');
   if(classes.find(c=>c.code===code)){showAlert('modal-alert','هذا الكود مستخدم بالفعل','error');return}
-  classes.push({id:Date.now(),name,subject,code,studentCount:0,teacherId:teacher.id||1});
+  classes.push({id:generateEntityId(),name,subject,code,studentCount:0,teacherId:teacher.id||1});
   localStorage.setItem('classes',JSON.stringify(classes));
   closeModal('modal-add-class');
   document.getElementById('cls-name').value='';
