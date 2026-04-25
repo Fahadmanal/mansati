@@ -125,9 +125,13 @@ document.getElementById('teacher-sub').textContent = `${teacher.subject||''} | $
 
 function load() {
   const classes = JSON.parse(localStorage.getItem('classes')||'[]').filter(c=>c.teacherId===(teacher.id||1));
-  const classIds = new Set(classes.map(c => Number(c.id)));
-  const tests   = JSON.parse(localStorage.getItem('tests')||'[]').filter(t => classIds.has(Number(t.classId)));
-  const results = JSON.parse(localStorage.getItem('results')||'[]').filter(r => classIds.has(Number(r.classId)));
+  const classIds = getTeacherClassIds(teacher.id || 1);
+  const tests   = classes.length
+    ? JSON.parse(localStorage.getItem('tests')||'[]').filter(t => classIds.has(Number(t.classId)))
+    : [];
+  const results = classes.length
+    ? JSON.parse(localStorage.getItem('results')||'[]').filter(r => classIds.has(Number(r.classId)))
+    : [];
   const students= JSON.parse(localStorage.getItem('students')||'[]');
 
   const totalStudents = classes.reduce((s,c)=>s+(c.studentCount||0),0);
