@@ -61,20 +61,38 @@
     <div id="form-student" class="hidden">
       <div style="text-align:center;margin-bottom:22px">
         <div style="font-size:52px;margin-bottom:8px;animation:float 3s ease-in-out infinite">🎓</div>
-        <p style="color:var(--text3);font-size:14px">أدخل كود الفصل الذي أعطاك إياه معلمك</p>
+        <p style="color:var(--text3);font-size:14px">سجّل دخول الطالب ثم انضم للفصل مرة واحدة</p>
       </div>
-      <div class="form-group">
-        <label class="form-label">اسمك الكامل</label>
-        <input type="text" class="form-input" id="student-name" placeholder="أدخل اسمك...">
+      <div class="tabs" style="margin-bottom:14px">
+        <button class="tab-btn active" id="tb-student-login" onclick="switchStudentAuth('login')">دخول</button>
+        <button class="tab-btn" id="tb-student-register" onclick="switchStudentAuth('register')">حساب جديد</button>
       </div>
-      <div class="form-group">
-        <label class="form-label">كود الفصل</label>
-        <input type="text" class="form-input" id="student-code"
-          placeholder="ABC123"
-          style="text-align:center;font-size:26px;font-weight:900;letter-spacing:8px;text-transform:uppercase"
-          oninput="this.value=this.value.toUpperCase()">
+      <div id="student-login-box">
+        <div class="form-group">
+          <label class="form-label">اسم المستخدم أو البريد</label>
+          <input type="text" class="form-input" id="student-user" placeholder="أدخل اسم المستخدم">
+        </div>
+        <div class="form-group">
+          <label class="form-label">كلمة المرور</label>
+          <input type="password" class="form-input" id="student-pass" placeholder="••••••••">
+        </div>
+        <button class="btn-login" onclick="loginStudent()" style="background:linear-gradient(135deg,var(--c3),#0284C7);box-shadow:0 6px 25px rgba(6,182,212,0.4)">دخول الطالب 🚀</button>
       </div>
-      <button class="btn-login" onclick="loginStudent()" style="background:linear-gradient(135deg,var(--c3),#0284C7);box-shadow:0 6px 25px rgba(6,182,212,0.4)">دخول الفصل 🚀</button>
+      <div id="student-register-box" class="hidden">
+        <div class="form-group">
+          <label class="form-label">الاسم الكامل</label>
+          <input type="text" class="form-input" id="student-name" placeholder="أدخل اسمك...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">اسم المستخدم</label>
+          <input type="text" class="form-input" id="student-username" placeholder="مثال: student123">
+        </div>
+        <div class="form-group">
+          <label class="form-label">كلمة المرور</label>
+          <input type="password" class="form-input" id="student-register-pass" placeholder="6 أحرف على الأقل">
+        </div>
+        <button class="btn-login" onclick="registerStudent()" style="background:linear-gradient(135deg,var(--c2),#7C3AED)">إنشاء حساب طالب ✨</button>
+      </div>
     </div>
   </div>
 </div>
@@ -86,6 +104,13 @@ function switchTab(t){
   document.getElementById('form-student').classList.toggle('hidden',isTch);
   document.getElementById('tb-teacher').classList.toggle('active',isTch);
   document.getElementById('tb-student').classList.toggle('active',!isTch);
+}
+function switchStudentAuth(mode){
+  const isLogin = mode === 'login';
+  document.getElementById('student-login-box').classList.toggle('hidden', !isLogin);
+  document.getElementById('student-register-box').classList.toggle('hidden', isLogin);
+  document.getElementById('tb-student-login').classList.toggle('active', isLogin);
+  document.getElementById('tb-student-register').classList.toggle('active', !isLogin);
 }
 function togglePass(id){const i=document.getElementById(id);i.type=i.type==='password'?'text':'password'}
 function showAlert(msg,type){
@@ -107,25 +132,37 @@ function loginTeacher(){
   } else showAlert('بيانات الدخول غير صحيحة','error');
 }
 function loginStudent(){
+  const user=document.getElementById('student-user').value.trim();
+  const pass=document.getElementById('student-pass').value.trim();
+  if(!user||!pass){showAlert('يرجى إدخال بيانات الطالب','error');return}
+  const studentUsers = JSON.parse(localStorage.getItem('studentUsers')||'[]');
+  const found = studentUsers.find(s => (s.username===user || s.email===user) && s.password===pass);
+  if(!found){showAlert('بيانات الطالب غير صحيحة','error');return}
+  localStorage.setItem('currentStudentUser', JSON.stringify(found));
+  window.location.href='student.html';
+}
+
+function registerStudent(){
   const name=document.getElementById('student-name').value.trim();
-  const code=document.getElementById('student-code').value.trim().toUpperCase();
-  if(!name||!code){showAlert('يرجى تعبئة الاسم والكود','error');return}
-  const classes=JSON.parse(localStorage.getItem('classes')||'[]');
-  const cls=classes.find(c=>c.code===code);
-  if(cls){
-    const cid=Number(cls.id);
-    let students=JSON.parse(localStorage.getItem('students')||'[]');
-    if(!students.some(s=>s.name===name&&Number(s.classId)===cid)){
-      students.push({name,classId:cid,addedAt:new Date().toISOString()});
-      localStorage.setItem('students',JSON.stringify(students));
-      let cs=JSON.parse(localStorage.getItem('classes')||'[]');
-      const ci=cs.findIndex(c=>Number(c.id)===cid);
-      if(ci!==-1){cs[ci].studentCount=students.filter(s=>Number(s.classId)===cid).length;localStorage.setItem('classes',JSON.stringify(cs));}
-    }
-    localStorage.setItem('currentStudent',JSON.stringify({name,classId:cid,className:cls.name,code}));
-    window.location.href='student.html';
-  }
-  else showAlert('كود الفصل غير صحيح','error');
+  const username=document.getElementById('student-username').value.trim();
+  const pass=document.getElementById('student-register-pass').value.trim();
+  if(!name||!username||!pass){showAlert('أكمل حقول إنشاء الحساب','error');return}
+  if(pass.length<6){showAlert('كلمة المرور يجب أن تكون 6 أحرف على الأقل','error');return}
+  const studentUsers = JSON.parse(localStorage.getItem('studentUsers')||'[]');
+  if(studentUsers.some(s => s.username===username)){showAlert('اسم المستخدم مستخدم مسبقاً','error');return}
+  const student = {
+    id: Date.now() * 1000 + Math.floor(Math.random()*1000),
+    name,
+    username,
+    password: pass,
+    classIds: [],
+    createdAt: new Date().toISOString()
+  };
+  studentUsers.push(student);
+  localStorage.setItem('studentUsers', JSON.stringify(studentUsers));
+  localStorage.setItem('currentStudentUser', JSON.stringify(student));
+  showAlert('تم إنشاء حساب الطالب بنجاح','success');
+  setTimeout(()=>window.location.href='student.html',700);
 }
 // بيانات تجريبية
 if(!localStorage.getItem('initialized')){

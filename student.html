@@ -27,22 +27,32 @@
       <div style="text-align:center;padding:40px 0 24px;">
         <div style="font-size:56px;margin-bottom:12px;">🎓</div>
         <h1 style="color:var(--text);font-size:24px;font-weight:800;">بوابة الطالب</h1>
-        <p style="color:var(--text3);font-size:14px;">أدخل معلوماتك للوصول لفصلك</p>
+        <p style="color:var(--text3);font-size:14px;">سجل دخولك كطالب من الصفحة الرئيسية أولاً</p>
       </div>
       <div class="login-card" style="max-width:400px;margin:0 auto;">
-        <div id="login-alert" class="hidden"></div>
-        <div class="form-group">
-          <label class="form-label">اسمك الكامل</label>
-          <input type="text" class="form-input" id="s-name" placeholder="أدخل اسمك">
+        <div id="login-alert" class="alert alert-error">❌ يلزم تسجيل دخول الطالب أولاً.</div>
+        <button class="login-btn" onclick="window.location.href='index.html'" style="background:var(--info);">العودة لتسجيل الدخول</button>
+      </div>
+    </div>
+
+    <!-- شاشة الانضمام للفصول -->
+    <div id="screen-join" class="hidden">
+      <div class="student-header">
+        <div>
+          <div style="font-size:18px;font-weight:700;" id="join-welcome">أهلاً</div>
+          <div style="font-size:13px;opacity:0.8;">انضمام للفصول</div>
         </div>
+        <button onclick="studentLogout()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:8px 14px;border-radius:10px;cursor:pointer;font-size:13px;">خروج</button>
+      </div>
+      <div style="background:#fff;border-radius:0 0 16px 16px;padding:16px;">
+        <div id="join-alert" class="hidden" style="margin-bottom:10px;"></div>
         <div class="form-group">
           <label class="form-label">كود الفصل</label>
-          <input type="text" class="form-input" id="s-code"
-            placeholder="ABC123"
-            style="text-align:center;font-size:24px;font-weight:800;letter-spacing:6px;text-transform:uppercase;"
-            oninput="this.value=this.value.toUpperCase()">
+          <input type="text" class="form-input" id="join-code" placeholder="ABC123" style="text-align:center;font-size:22px;font-weight:800;letter-spacing:6px;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
         </div>
-        <button class="login-btn" onclick="studentLogin()" style="background:var(--info);">دخول الفصل 🚀</button>
+        <button class="btn-primary" onclick="joinClassByCode()" style="width:100%;margin-bottom:12px;">الانضمام للفصل</button>
+        <div style="font-size:13px;color:var(--text3);margin-bottom:8px;">فصولي الحالية:</div>
+        <div id="joined-classes-list"></div>
       </div>
     </div>
 
@@ -104,13 +114,104 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/cloud-db.js"></script>
 <script>
+  let currentStudentUser = JSON.parse(localStorage.getItem('currentStudentUser')||'null');
   let currentStudent = JSON.parse(localStorage.getItem('currentStudent')||'null');
   let currentTest = null, currentQIndex = 0, answers = {}, timerInterval = null;
   const questionTypeText = { mcq: 'اختيار متعدد', essay: 'مقالي', compare: 'مقارنة' };
 
   function showScreen(id) {
-    ['login','class','test','result'].forEach(s => document.getElementById('screen-'+s).classList.add('hidden'));
+    ['login','join','class','test','result'].forEach(s => document.getElementById('screen-'+s).classList.add('hidden'));
     document.getElementById('screen-'+id).classList.remove('hidden');
+  }
+
+  function persistCurrentStudentUser(user) {
+    currentStudentUser = user;
+    localStorage.setItem('currentStudentUser', JSON.stringify(user));
+    const all = JSON.parse(localStorage.getItem('studentUsers') || '[]');
+    const i = all.findIndex(s => Number(s.id) === Number(user.id));
+    if (i !== -1) {
+      all[i] = user;
+      localStorage.setItem('studentUsers', JSON.stringify(all));
+    }
+  }
+
+  function openClassFromMembership(cls) {
+    currentStudent = { name: currentStudentUser.name, classId: Number(cls.id), className: cls.name, code: cls.code };
+    currentStudent = registerStudentIfNeeded(currentStudent);
+    localStorage.setItem('currentStudent', JSON.stringify(currentStudent));
+    loadClassScreen();
+  }
+
+  async function renderJoinScreen() {
+    if (!currentStudentUser) { showScreen('login'); return; }
+    document.getElementById('join-welcome').textContent = `أهلاً، ${currentStudentUser.name}`;
+    const classes = JSON.parse(localStorage.getItem('classes') || '[]');
+    const classIds = (currentStudentUser.classIds || []).map(Number);
+    const joined = classIds.map(id => classes.find(c => Number(c.id) === id)).filter(Boolean);
+    const list = document.getElementById('joined-classes-list');
+    if (!joined.length) {
+      list.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:8px 0;">لم تنضم لأي فصل بعد.</div>`;
+    } else {
+      list.innerHTML = joined.map(c => `
+        <button type="button" class="btn btn-secondary" style="width:100%;margin-bottom:8px;text-align:right" onclick="openClassFromMembership({id:${Number(c.id)},name:${JSON.stringify(c.name)},code:${JSON.stringify(c.code)}})">
+          ${c.name} <span style="opacity:.7">(${c.code})</span>
+        </button>
+      `).join('');
+    }
+    showScreen('join');
+  }
+
+  async function joinClassByCode() {
+    const code = document.getElementById('join-code').value.trim().toUpperCase();
+    if (!code) { showJoinAlert('أدخل كود الفصل', 'error'); return; }
+    let classes = JSON.parse(localStorage.getItem('classes') || '[]');
+    let cls = classes.find(c => c.code === code);
+    if (!cls && window.cloudDB?.isEnabled()) {
+      try {
+        const remoteClass = await cloudDB.findClassByCode(code);
+        if (remoteClass) {
+          cls = {
+            id: Number(remoteClass.id),
+            name: remoteClass.name,
+            subject: remoteClass.subject || '',
+            code: remoteClass.code,
+            teacherId: Number(remoteClass.teacher_id || 1),
+            studentCount: Number(remoteClass.student_count || 0),
+            createdAt: remoteClass.created_at || new Date().toISOString()
+          };
+          classes.push(cls);
+          localStorage.setItem('classes', JSON.stringify(classes));
+        }
+      } catch (e) {
+        console.warn('Cloud class lookup failed:', e.message);
+      }
+    }
+    if (!cls) { showJoinAlert('كود الفصل غير صحيح', 'error'); return; }
+
+    const classIds = new Set((currentStudentUser.classIds || []).map(Number));
+    classIds.add(Number(cls.id));
+    persistCurrentStudentUser({ ...currentStudentUser, classIds: [...classIds] });
+
+    currentStudent = { name: currentStudentUser.name, classId: Number(cls.id), className: cls.name, code: cls.code };
+    currentStudent = registerStudentIfNeeded(currentStudent);
+    if (window.cloudDB?.isEnabled()) {
+      try {
+        await cloudDB.upsertClass(cls);
+        await cloudDB.upsertStudent({ name: currentStudentUser.name, classId: cls.id });
+      } catch (e) {
+        console.warn('Cloud student save failed:', e.message);
+      }
+    }
+    showJoinAlert('تم الانضمام للفصل بنجاح', 'success');
+    setTimeout(() => loadClassScreen(), 400);
+  }
+
+  function showJoinAlert(msg, type) {
+    const a = document.getElementById('join-alert');
+    a.className = `alert alert-${type}`;
+    a.textContent = (type === 'success' ? '✅ ' : '❌ ') + msg;
+    a.classList.remove('hidden');
+    setTimeout(() => a.classList.add('hidden'), 2500);
   }
 
   /** يضيف الطالب لقائمة الفصل في localStorage (لتظهر أسماؤهم عند المعلم) */
@@ -133,62 +234,18 @@
     return normalized;
   }
 
-  async function studentLogin() {
-    const name = document.getElementById('s-name').value.trim();
-    const code = document.getElementById('s-code').value.trim().toUpperCase();
-    if (!name || !code) { showLoginAlert('يرجى تعبئة الاسم والكود','error'); return; }
-    let classes = JSON.parse(localStorage.getItem('classes')||'[]');
-    let cls = classes.find(c=>c.code===code);
-    if (!cls && window.cloudDB?.isEnabled()) {
-      try {
-        const remoteClass = await cloudDB.findClassByCode(code);
-        if (remoteClass) {
-          cls = {
-            id: Number(remoteClass.id),
-            name: remoteClass.name,
-            subject: remoteClass.subject || '',
-            code: remoteClass.code,
-            teacherId: Number(remoteClass.teacher_id || 1),
-            studentCount: Number(remoteClass.student_count || 0),
-            createdAt: remoteClass.created_at || new Date().toISOString()
-          };
-          classes.push(cls);
-          localStorage.setItem('classes', JSON.stringify(classes));
-        }
-      } catch (e) {
-        console.warn('Cloud class lookup failed:', e.message);
-      }
-    }
-    if (!cls) { showLoginAlert('كود الفصل غير صحيح','error'); return; }
-    currentStudent = { name, classId: cls.id, className: cls.name, code };
-    currentStudent = registerStudentIfNeeded(currentStudent);
-    if (window.cloudDB?.isEnabled()) {
-      try {
-        // Ensure class exists remotely before inserting student (FK safety).
-        await cloudDB.upsertClass(cls);
-        await cloudDB.upsertStudent({ name, classId: cls.id });
-      } catch (e) {
-        console.warn('Cloud student save failed:', e.message);
-      }
-    }
-    loadClassScreen();
-  }
-
-  function showLoginAlert(msg, type) {
-    const a = document.getElementById('login-alert');
-    a.className = `alert alert-${type}`;
-    a.textContent = type==='error'?'❌ '+msg:'✅ '+msg;
-    a.classList.remove('hidden');
-    setTimeout(()=>a.classList.add('hidden'),3000);
-  }
+  function showLoginAlert() {}
 
   async function loadClassScreen() {
-    if(!currentStudent){showScreen('login');return;}
+    if(!currentStudentUser){showScreen('login');return;}
+    if(!currentStudent){renderJoinScreen();return;}
+    const isJoined = (currentStudentUser.classIds || []).map(Number).includes(Number(currentStudent.classId));
+    if (!isJoined) { renderJoinScreen(); return; }
     const cid = Number(currentStudent.classId);
-    document.getElementById('s-welcome').textContent = `أهلاً، ${currentStudent.name}`;
+    document.getElementById('s-welcome').textContent = `أهلاً، ${currentStudentUser.name}`;
     document.getElementById('s-class-name').textContent = currentStudent.className;
     let tests = JSON.parse(localStorage.getItem('tests')||'[]').filter(t=>Number(t.classId)===cid && t.active);
-    let results = JSON.parse(localStorage.getItem('results')||'[]').filter(r=>r.studentName===currentStudent.name&&Number(r.classId)===cid);
+    let results = JSON.parse(localStorage.getItem('results')||'[]').filter(r=>r.studentName===currentStudentUser.name&&Number(r.classId)===cid);
     if (window.cloudDB?.isEnabled()) {
       try {
         const [remoteTests, remoteResults] = await Promise.all([
@@ -225,7 +282,7 @@
             answers: r.answers || {}
           }));
           localStorage.setItem('results', JSON.stringify(mapped));
-          results = mapped.filter(r=>r.studentName===currentStudent.name&&Number(r.classId)===cid);
+          results = mapped.filter(r=>r.studentName===currentStudentUser.name&&Number(r.classId)===cid);
         }
       } catch (e) {
         console.warn('Cloud student sync failed:', e.message);
@@ -327,7 +384,7 @@
     const needsManualReview = currentTest.questions.length > autoTotal;
     const now = new Date();
     const result = {
-      studentName: currentStudent.name,
+      studentName: currentStudentUser.name,
       classId: currentStudent.classId,
       testId: currentTest.id,
       score, correct,
@@ -393,13 +450,23 @@
   }
 
   function goBack() { loadClassScreen(); }
-  function studentLogout() { localStorage.removeItem('currentStudent'); currentStudent=null; showScreen('login'); }
+  function studentLogout() {
+    localStorage.removeItem('currentStudent');
+    localStorage.removeItem('currentStudentUser');
+    currentStudent = null;
+    currentStudentUser = null;
+    showScreen('login');
+  }
 
   // تحميل تلقائي — مهم: من دخل من index.html يجب تسجيله في قائمة الطلاب
-  if (currentStudent) {
+  if (!currentStudentUser) {
+    showScreen('login');
+  } else if (currentStudent) {
     currentStudent = registerStudentIfNeeded(currentStudent);
     loadClassScreen();
-  } else showScreen('login');
+  } else {
+    renderJoinScreen();
+  }
 </script>
 </body>
 </html>
