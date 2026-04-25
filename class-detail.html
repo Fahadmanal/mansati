@@ -86,6 +86,8 @@
 </div>
 
 <script src="js/app.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/cloud-db.js"></script>
 <script>
   const teacher = checkAuth();
   document.getElementById('sidebar-container').innerHTML = getSidebar('classes');
@@ -100,16 +102,117 @@
   document.getElementById('class-name-bc').textContent = cls.name;
   document.getElementById('class-subtitle').textContent = (cls.subject ? cls.subject + ' · ' : '') + 'كود الفصل: ' + cls.code;
 
-  function loadClassData() {
-    const tests   = JSON.parse(localStorage.getItem('tests')   || '[]').filter(t => Number(t.classId) === classId);
-    const results = JSON.parse(localStorage.getItem('results') || '[]').filter(r => Number(r.classId) === classId);
-    const registered = JSON.parse(localStorage.getItem('students') || '[]').filter(s => Number(s.classId) === classId);
+  async function loadClassData() {
+    let allTests = JSON.parse(localStorage.getItem('tests') || '[]');
+    let tests = allTests.filter(t => Number(t.classId) === classId);
+    if (window.cloudDB?.isEnabled()) {
+      try {
+        const remoteTests = await cloudDB.listTestsByClass(classId, false) || [];
+        if (remoteTests.length === 0 && tests.length > 0) {
+          await Promise.all(tests.map(t => cloudDB.upsertTest(t)));
+        } else if (remoteTests.length > 0) {
+          const mappedTests = remoteTests.map(t => ({
+            id: Number(t.id),
+            classId: Number(t.class_id),
+            title: t.title,
+            type: t.type,
+            duration: Number(t.duration || 0),
+            questions: t.questions || [],
+            active: Boolean(t.active),
+            teacherId: Number(t.teacher_id || 1),
+            createdAt: t.created_at || new Date().toISOString()
+          }));
+          const untouched = allTests.filter(t => Number(t.classId) !== classId);
+          allTests = untouched.concat(mappedTests);
+          localStorage.setItem('tests', JSON.stringify(allTests));
+          tests = mappedTests;
+        }
+      } catch (e) {
+        console.warn('Cloud tests sync failed:', e.message);
+      }
+    }
+
+    // مزامنة النتائج: بعض السجلات القديمة قد لا تحتوي classId، فنستنتجه من testId
+    let allResults = JSON.parse(localStorage.getItem('results') || '[]');
+    let resultsChanged = false;
+    allResults.forEach(r => {
+      if (r.classId == null || Number.isNaN(Number(r.classId))) {
+        const t = allTests.find(x => Number(x.id) === Number(r.testId));
+        if (t) {
+          r.classId = Number(t.classId);
+          resultsChanged = true;
+        }
+      } else {
+        r.classId = Number(r.classId);
+      }
+    });
+    if (resultsChanged) {
+      localStorage.setItem('results', JSON.stringify(allResults));
+    }
+    const results = allResults.filter(r => Number(r.classId) === classId);
+
+    let allStudents = JSON.parse(localStorage.getItem('students') || '[]');
+    if (window.cloudDB?.isEnabled()) {
+      try {
+        const [remoteResults, remoteStudents] = await Promise.all([
+          cloudDB.listResultsByClass(classId),
+          cloudDB.listStudentsByClass(classId)
+        ]);
+        if (Array.isArray(remoteResults)) {
+          allResults = remoteResults.map(r => ({
+            studentName: r.student_name,
+            classId: Number(r.class_id),
+            testId: Number(r.test_id),
+            score: Number(r.score || 0),
+            correct: Number(r.correct || 0),
+            total: Number(r.total || 0),
+            totalQuestions: Number(r.total_questions || r.total || 0),
+            needsManualReview: Boolean(r.needs_manual_review),
+            type: r.type,
+            time: r.duration_text || '—',
+            date: r.date_text || '',
+            answers: r.answers || {}
+          }));
+          localStorage.setItem('results', JSON.stringify(allResults));
+        }
+        if (Array.isArray(remoteStudents)) {
+          allStudents = remoteStudents.map(s => ({
+            name: s.name,
+            classId: Number(s.class_id),
+            addedAt: s.added_at || null
+          }));
+          localStorage.setItem('students', JSON.stringify(allStudents));
+        }
+      } catch (e) {
+        console.warn('Cloud class sync failed:', e.message);
+      }
+    }
+    const registered = allStudents.filter(s => Number(s.classId) === classId);
     const seen = new Set(registered.map(s => s.name));
     const students = [...registered];
+    let studentsChanged = false;
     results.forEach(r => {
       const n = r.studentName;
-      if (n && !seen.has(n)) { seen.add(n); students.push({ name: n, classId, addedAt: null, inferredFromResults: true }); }
+      if (n && !seen.has(n)) {
+        seen.add(n);
+        const inferred = { name: n, classId, addedAt: null, inferredFromResults: true };
+        students.push(inferred);
+        allStudents.push(inferred);
+        studentsChanged = true;
+      }
     });
+    if (studentsChanged) {
+      localStorage.setItem('students', JSON.stringify(allStudents));
+    }
+
+    // مزامنة عدد الطلاب الحقيقي مع بطاقة الفصل
+    const classesArr = JSON.parse(localStorage.getItem('classes') || '[]');
+    const ci = classesArr.findIndex(c => Number(c.id) === classId);
+    if (ci !== -1 && Number(classesArr[ci].studentCount || 0) !== students.length) {
+      classesArr[ci].studentCount = students.length;
+      localStorage.setItem('classes', JSON.stringify(classesArr));
+    }
+
     const avg = results.length ? Math.round(results.reduce((s,r)=>s+r.score,0)/results.length) : 0;
 
     document.getElementById('class-info-cards').innerHTML = `
@@ -249,6 +352,8 @@
   }
 
   loadClassData();
+  window.addEventListener('storage', () => loadClassData());
+  window.addEventListener('focus', () => loadClassData());
 </script>
 </body>
 </html>

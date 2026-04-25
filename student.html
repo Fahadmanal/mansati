@@ -101,6 +101,8 @@
     </div>
   </div>
 
+<script src="js/supabase-config.js"></script>
+<script src="js/cloud-db.js"></script>
 <script>
   let currentStudent = JSON.parse(localStorage.getItem('currentStudent')||'null');
   let currentTest = null, currentQIndex = 0, answers = {}, timerInterval = null;
@@ -131,15 +133,38 @@
     return normalized;
   }
 
-  function studentLogin() {
+  async function studentLogin() {
     const name = document.getElementById('s-name').value.trim();
     const code = document.getElementById('s-code').value.trim().toUpperCase();
     if (!name || !code) { showLoginAlert('يرجى تعبئة الاسم والكود','error'); return; }
-    const classes = JSON.parse(localStorage.getItem('classes')||'[]');
-    const cls = classes.find(c=>c.code===code);
+    let classes = JSON.parse(localStorage.getItem('classes')||'[]');
+    let cls = classes.find(c=>c.code===code);
+    if (!cls && window.cloudDB?.isEnabled()) {
+      try {
+        const remoteClass = await cloudDB.findClassByCode(code);
+        if (remoteClass) {
+          cls = {
+            id: Number(remoteClass.id),
+            name: remoteClass.name,
+            subject: remoteClass.subject || '',
+            code: remoteClass.code,
+            teacherId: Number(remoteClass.teacher_id || 1),
+            studentCount: Number(remoteClass.student_count || 0),
+            createdAt: remoteClass.created_at || new Date().toISOString()
+          };
+          classes.push(cls);
+          localStorage.setItem('classes', JSON.stringify(classes));
+        }
+      } catch (e) {
+        console.warn('Cloud class lookup failed:', e.message);
+      }
+    }
     if (!cls) { showLoginAlert('كود الفصل غير صحيح','error'); return; }
     currentStudent = { name, classId: cls.id, className: cls.name, code };
     currentStudent = registerStudentIfNeeded(currentStudent);
+    if (window.cloudDB?.isEnabled()) {
+      try { await cloudDB.upsertStudent({ name, classId: cls.id }); } catch (e) { console.warn('Cloud student save failed:', e.message); }
+    }
     loadClassScreen();
   }
 
@@ -151,13 +176,55 @@
     setTimeout(()=>a.classList.add('hidden'),3000);
   }
 
-  function loadClassScreen() {
+  async function loadClassScreen() {
     if(!currentStudent){showScreen('login');return;}
     const cid = Number(currentStudent.classId);
     document.getElementById('s-welcome').textContent = `أهلاً، ${currentStudent.name}`;
     document.getElementById('s-class-name').textContent = currentStudent.className;
-    const tests = JSON.parse(localStorage.getItem('tests')||'[]').filter(t=>Number(t.classId)===cid && t.active);
-    const results = JSON.parse(localStorage.getItem('results')||'[]').filter(r=>r.studentName===currentStudent.name&&Number(r.classId)===cid);
+    let tests = JSON.parse(localStorage.getItem('tests')||'[]').filter(t=>Number(t.classId)===cid && t.active);
+    let results = JSON.parse(localStorage.getItem('results')||'[]').filter(r=>r.studentName===currentStudent.name&&Number(r.classId)===cid);
+    if (window.cloudDB?.isEnabled()) {
+      try {
+        const [remoteTests, remoteResults] = await Promise.all([
+          cloudDB.listTestsByClass(cid, true),
+          cloudDB.listResultsByClass(cid)
+        ]);
+        if (Array.isArray(remoteTests)) {
+          tests = remoteTests.map(t => ({
+            id: Number(t.id),
+            classId: Number(t.class_id),
+            title: t.title,
+            type: t.type,
+            duration: Number(t.duration || 0),
+            questions: t.questions || [],
+            active: Boolean(t.active),
+            teacherId: Number(t.teacher_id || 1),
+            createdAt: t.created_at || new Date().toISOString()
+          }));
+          localStorage.setItem('tests', JSON.stringify(tests));
+        }
+        if (Array.isArray(remoteResults)) {
+          const mapped = remoteResults.map(r => ({
+            studentName: r.student_name,
+            classId: Number(r.class_id),
+            testId: Number(r.test_id),
+            score: Number(r.score || 0),
+            correct: Number(r.correct || 0),
+            total: Number(r.total || 0),
+            totalQuestions: Number(r.total_questions || r.total || 0),
+            needsManualReview: Boolean(r.needs_manual_review),
+            type: r.type,
+            time: r.duration_text || '—',
+            date: r.date_text || '',
+            answers: r.answers || {}
+          }));
+          localStorage.setItem('results', JSON.stringify(mapped));
+          results = mapped.filter(r=>r.studentName===currentStudent.name&&Number(r.classId)===cid);
+        }
+      } catch (e) {
+        console.warn('Cloud student sync failed:', e.message);
+      }
+    }
     const doneIds = results.map(r=>r.testId);
     document.getElementById('s-test-count').textContent = tests.length;
     document.getElementById('s-done-count').textContent = doneIds.length;
@@ -239,7 +306,7 @@
   function nextQ() { if(currentQIndex<currentTest.questions.length-1){currentQIndex++;renderQuestion();} }
   function prevQ() { if(currentQIndex>0){currentQIndex--;renderQuestion();} }
 
-  function submitTest() {
+  async function submitTest() {
     clearInterval(timerInterval);
     let correct = 0;
     let autoTotal = 0;
@@ -269,6 +336,9 @@
     const results = JSON.parse(localStorage.getItem('results')||'[]');
     results.push(result);
     localStorage.setItem('results',JSON.stringify(results));
+    if (window.cloudDB?.isEnabled()) {
+      try { await cloudDB.insertResult(result); } catch (e) { console.warn('Cloud result save failed:', e.message); }
+    }
     showResult(result);
   }
 
