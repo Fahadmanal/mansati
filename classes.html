@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصتي — فصولي</title>
+  <link rel="stylesheet" href="css/style.css?v=20260406">
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main-content">
+  <div class="topbar">
+    <div class="topbar-title">
+      <h1>📚 فصولي</h1>
+      <p>إدارة فصولك، أكواد الدخول، والربط مع الاختبارات</p>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="btn btn-primary" style="padding:10px 18px;font-size:13px" onclick="openAddClassModal()">+ إنشاء فصل</button>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="class-grid" id="classes-grid"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="add-class-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✨ إنشاء فصل جديد</div>
+      <div class="modal-close" onclick="closeModal('add-class-modal')">✕</div>
+    </div>
+    <div id="modal-alert" class="hidden"></div>
+    <div class="form-group">
+      <label class="form-label">اسم الفصل</label>
+      <input type="text" class="form-input" id="new-class-name" placeholder="مثال: الثالث المتوسط أ">
+    </div>
+    <div class="form-group">
+      <label class="form-label">المادة</label>
+      <input type="text" class="form-input" id="new-class-subject" placeholder="مثال: لغتي">
+    </div>
+    <div class="form-group">
+      <label class="form-label">كود الفصل</label>
+      <div style="display:flex;gap:8px;align-items:stretch">
+        <input type="text" class="form-input" id="new-class-code" placeholder="ABC123" style="text-transform:uppercase;letter-spacing:4px;font-weight:800;font-size:16px;text-align:center">
+        <button type="button" class="btn btn-secondary" style="padding:0 16px;font-size:18px" onclick="document.getElementById('new-class-code').value=generateCode()" title="توليد كود">🔄</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button type="button" class="btn btn-primary" style="flex:1" onclick="addClass()">إنشاء الفصل</button>
+      <button type="button" class="btn btn-secondary" style="flex:1" onclick="closeModal('add-class-modal')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const teacher = checkAuth();
+document.getElementById('sidebar-container').innerHTML = getSidebar('classes');
+
+function openAddClassModal() {
+  document.getElementById('new-class-code').value = generateCode();
+  document.getElementById('modal-alert').classList.add('hidden');
+  openModal('add-class-modal');
+}
+
+function loadClasses() {
+  const classes = JSON.parse(localStorage.getItem('classes') || '[]').filter(c => c.teacherId === (teacher.id || 1));
+  const grid = document.getElementById('classes-grid');
+  if (!classes.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1"><div class="empty-state"><div class="empty-icon">📚</div><p>لا توجد فصول بعد</p><small>اضغط «إنشاء فصل» للبدء</small></div></div>`;
+    return;
+  }
+  const tests = JSON.parse(localStorage.getItem('tests') || '[]');
+  const results = JSON.parse(localStorage.getItem('results') || '[]');
+  grid.innerHTML = classes.map(cls => {
+    const ct = tests.filter(t => Number(t.classId) === Number(cls.id)).length;
+    const cr = results.filter(r => Number(r.classId) === Number(cls.id));
+    const ca = cr.length ? Math.round(cr.reduce((s, r) => s + r.score, 0) / cr.length) : 0;
+    return `<div class="class-card" onclick="window.location='class-detail.html?id=${cls.id}'">
+      <div class="class-card-top"><div class="class-card-top-shapes"></div><div class="class-emoji">📚</div></div>
+      <div class="class-card-body">
+        <div class="class-name">${cls.name}</div>
+        <div class="class-meta">
+          <span>📖 ${cls.subject || '—'}</span>
+          <span>👥 ${cls.studentCount || 0} طالب</span>
+          <span>📝 ${ct} نشاط</span>
+          <span>📈 ${ca}% متوسط</span>
+        </div>
+        <div class="class-code-pill">
+          <div><div class="code-label">كود الفصل</div><div class="code-val">${cls.code}</div></div>
+          <button type="button" class="code-copy" onclick="event.stopPropagation();copyToClipboard('${cls.code}',this)">📋 نسخ</button>
+        </div>
+        <div class="class-actions">
+          <button type="button" class="btn-sm btn-sm-primary" onclick="event.stopPropagation();window.location='tests.html?classId=${cls.id}'">+ اختبار</button>
+          <button type="button" class="btn-sm btn-sm-ghost" style="flex:0.5;font-size:18px" onclick="event.stopPropagation();deleteClass(${cls.id})" title="حذف">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addClass() {
+  const name = document.getElementById('new-class-name').value.trim();
+  const subject = document.getElementById('new-class-subject').value.trim();
+  const code = document.getElementById('new-class-code').value.trim().toUpperCase();
+  if (!name || !code) { showAlert('modal-alert', 'أدخل اسم الفصل والكود', 'error'); return; }
+  const classes = JSON.parse(localStorage.getItem('classes') || '[]');
+  if (classes.find(c => c.code === code)) { showAlert('modal-alert', 'هذا الكود مستخدم مسبقاً', 'error'); return; }
+  classes.push({ id: Date.now(), name, subject, code, studentCount: 0, teacherId: teacher.id || 1, createdAt: new Date().toISOString() });
+  localStorage.setItem('classes', JSON.stringify(classes));
+  closeModal('add-class-modal');
+  document.getElementById('new-class-name').value = '';
+  document.getElementById('new-class-subject').value = '';
+  loadClasses();
+}
+
+function deleteClass(id) {
+  if (!confirm('هل تريد حذف هذا الفصل وجميع اختباراته ونتائجه؟')) return;
+  purgeClassData(id);
+  const c = JSON.parse(localStorage.getItem('classes') || '[]').filter(x => Number(x.id) !== Number(id));
+  localStorage.setItem('classes', JSON.stringify(c));
+  loadClasses();
+}
+
+loadClasses();
+</script>
+</body>
+</html>

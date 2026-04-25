@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>منصتي التعليمية</title>
+<link rel="stylesheet" href="css/style.css?v=20260406">
+</head>
+<body>
+<div class="login-page">
+  <div class="login-bg-orb orb1"></div>
+  <div class="login-bg-orb orb2"></div>
+  <div class="login-bg-orb orb3"></div>
+
+  <!-- زخارف عائمة -->
+  <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden">
+    <div style="position:absolute;top:15%;right:10%;font-size:40px;opacity:0.15;animation:float 4s ease-in-out infinite">📚</div>
+    <div style="position:absolute;top:70%;right:20%;font-size:30px;opacity:0.12;animation:float 5s ease-in-out infinite 1s">✏️</div>
+    <div style="position:absolute;top:30%;left:15%;font-size:36px;opacity:0.12;animation:float 3.5s ease-in-out infinite 0.5s">🎯</div>
+    <div style="position:absolute;bottom:20%;left:10%;font-size:32px;opacity:0.10;animation:float 4.5s ease-in-out infinite 2s">🏆</div>
+  </div>
+
+  <div class="login-card anim-fadeup">
+    <div class="login-logo">
+      <div class="login-logo-icon">م</div>
+      <h1>منصتي التعليمية</h1>
+      <p>بيئة تعليمية متكاملة وذكية 🚀</p>
+    </div>
+
+    <div id="login-alert" class="hidden"></div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tb-teacher" onclick="switchTab('teacher')">👨‍🏫 معلم</button>
+      <button class="tab-btn" id="tb-student" onclick="switchTab('student')">🎓 طالب</button>
+    </div>
+
+    <!-- نموذج المعلم -->
+    <div id="form-teacher">
+      <div class="form-group">
+        <label class="form-label">البريد الإلكتروني أو اسم المستخدم</label>
+        <input type="text" class="form-input" id="teacher-user" placeholder="أدخل بريدك...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">كلمة المرور</label>
+        <div class="form-input-wrap">
+          <input type="password" class="form-input" id="teacher-pass" placeholder="••••••••" style="padding-left:44px">
+          <button class="input-eye" onclick="togglePass('teacher-pass')">👁️</button>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:22px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer">
+          <input type="checkbox" style="accent-color:var(--c1)"> تذكرني
+        </label>
+        <a href="#" style="font-size:13px;color:var(--c2);font-weight:600">نسيت كلمة المرور؟</a>
+      </div>
+      <button class="btn-login" onclick="loginTeacher()">تسجيل الدخول ✨</button>
+      <div class="login-footer">ليس لديك حساب؟ <a href="register.html">أنشئ حسابك الآن</a></div>
+      <div class="login-hint">💡 للتجربة: <strong>demo</strong> / <strong>123456</strong></div>
+    </div>
+
+    <!-- نموذج الطالب -->
+    <div id="form-student" class="hidden">
+      <div style="text-align:center;margin-bottom:22px">
+        <div style="font-size:52px;margin-bottom:8px;animation:float 3s ease-in-out infinite">🎓</div>
+        <p style="color:var(--text3);font-size:14px">أدخل كود الفصل الذي أعطاك إياه معلمك</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">اسمك الكامل</label>
+        <input type="text" class="form-input" id="student-name" placeholder="أدخل اسمك...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">كود الفصل</label>
+        <input type="text" class="form-input" id="student-code"
+          placeholder="ABC123"
+          style="text-align:center;font-size:26px;font-weight:900;letter-spacing:8px;text-transform:uppercase"
+          oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <button class="btn-login" onclick="loginStudent()" style="background:linear-gradient(135deg,var(--c3),#0284C7);box-shadow:0 6px 25px rgba(6,182,212,0.4)">دخول الفصل 🚀</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(t){
+  const isTch=t==='teacher';
+  document.getElementById('form-teacher').classList.toggle('hidden',!isTch);
+  document.getElementById('form-student').classList.toggle('hidden',isTch);
+  document.getElementById('tb-teacher').classList.toggle('active',isTch);
+  document.getElementById('tb-student').classList.toggle('active',!isTch);
+}
+function togglePass(id){const i=document.getElementById(id);i.type=i.type==='password'?'text':'password'}
+function showAlert(msg,type){
+  const b=document.getElementById('login-alert');
+  b.className=`alert alert-${type}`;b.textContent=(type==='success'?'✅ ':'❌ ')+msg;
+  b.classList.remove('hidden');setTimeout(()=>b.classList.add('hidden'),3000);
+}
+function loginTeacher(){
+  const u=document.getElementById('teacher-user').value.trim();
+  const p=document.getElementById('teacher-pass').value.trim();
+  if(!u||!p){showAlert('يرجى تعبئة جميع الحقول','error');return}
+  const teachers=JSON.parse(localStorage.getItem('teachers')||'[]');
+  const found=teachers.find(t=>(t.email===u||t.username===u)&&t.password===p);
+  if(found||(u==='demo'&&p==='123456')){
+    const teacher=found||{id:1,name:'فهد عليان العنزي',email:'demo',subject:'لغتي',grade:'الثالث المتوسط',points:0};
+    localStorage.setItem('currentTeacher',JSON.stringify(teacher));
+    showAlert('مرحباً بك! 🎉','success');
+    setTimeout(()=>window.location.href='dashboard.html',700);
+  } else showAlert('بيانات الدخول غير صحيحة','error');
+}
+function loginStudent(){
+  const name=document.getElementById('student-name').value.trim();
+  const code=document.getElementById('student-code').value.trim().toUpperCase();
+  if(!name||!code){showAlert('يرجى تعبئة الاسم والكود','error');return}
+  const classes=JSON.parse(localStorage.getItem('classes')||'[]');
+  const cls=classes.find(c=>c.code===code);
+  if(cls){
+    const cid=Number(cls.id);
+    let students=JSON.parse(localStorage.getItem('students')||'[]');
+    if(!students.some(s=>s.name===name&&Number(s.classId)===cid)){
+      students.push({name,classId:cid,addedAt:new Date().toISOString()});
+      localStorage.setItem('students',JSON.stringify(students));
+      let cs=JSON.parse(localStorage.getItem('classes')||'[]');
+      const ci=cs.findIndex(c=>Number(c.id)===cid);
+      if(ci!==-1){cs[ci].studentCount=students.filter(s=>Number(s.classId)===cid).length;localStorage.setItem('classes',JSON.stringify(cs));}
+    }
+    localStorage.setItem('currentStudent',JSON.stringify({name,classId:cid,className:cls.name,code}));
+    window.location.href='student.html';
+  }
+  else showAlert('كود الفصل غير صحيح','error');
+}
+// بيانات تجريبية
+if(!localStorage.getItem('initialized')){
+  const teachersSeed=[
+    {id:1,name:'فهد عليان العنزي',email:'demo',username:'demo',password:'123456',subject:'لغتي',grade:'الثالث المتوسط',points:0}
+  ];
+  localStorage.setItem('teachers',JSON.stringify(teachersSeed));
+  const classes=[
+    {id:1,name:'الثالث المتوسط أ',code:'STAR01',subject:'لغتي',studentCount:3,teacherId:1},
+    {id:2,name:'الثالث المتوسط ب',code:'STAR02',subject:'لغتي',studentCount:2,teacherId:1}
+  ];
+  const tests=[
+    {id:1,classId:1,title:'اختبار الوحدة الأولى',type:'test',active:true,teacherId:1,
+     questions:[
+       {text:'ما مفرد كلمة "أقلام"؟',options:['قلم','قلام','أقلم','قليم'],correct:0},
+       {text:'أي الجمل التالية صحيحة نحوياً؟',options:['ذهبَ الطلابُ','ذهبَ الطلابَ','ذهبُ الطلابُ','ذهبِ الطلابُ'],correct:0},
+       {text:'ما معنى كلمة "فصيح"؟',options:['بليغ الكلام','سريع الحركة','قوي البنية','حاد النظر'],correct:0},
+     ],createdAt:new Date().toISOString()},
+    {id:2,classId:1,title:'تحدي الإملاء الأسبوعي ⚡',type:'challenge',active:true,teacherId:1,
+     questions:[
+       {text:'أي الكلمات مكتوبة صحيحاً؟',options:['إنسان','اِنسان','إنسآن','انسان'],correct:0},
+       {text:'الهمزة في كلمة "أسرة" همزة...',options:['قطع','وصل','متوسطة','متطرفة'],correct:0},
+     ],createdAt:new Date().toISOString()},
+    {id:3,classId:1,title:'واجب: الفعل والفاعل 📖',type:'homework',active:true,teacherId:1,
+     questions:[
+       {text:'في جملة "كتب الطالبُ الدرسَ" — ما الفاعل؟',options:['الطالبُ','كتب','الدرسَ','لا يوجد'],correct:0},
+     ],createdAt:new Date().toISOString()},
+  ];
+  const results=[
+    {studentName:'أحمد محمد العتيبي',classId:1,testId:1,score:90,time:'3د 20ث',date:'٢٠٢٦/٣/١',type:'test'},
+    {studentName:'سارة خالد العمري',classId:1,testId:2,score:100,time:'1د 45ث',date:'٢٠٢٦/٣/١',type:'challenge'},
+    {studentName:'خالد عبدالله الغامدي',classId:1,testId:1,score:70,time:'5د 10ث',date:'٢٠٢٦/٣/٢',type:'test'},
+    {studentName:'نورة سعد الزهراني',classId:1,testId:2,score:80,time:'2د 30ث',date:'٢٠٢٦/٣/٢',type:'challenge'},
+    {studentName:'أحمد محمد العتيبي',classId:1,testId:3,score:85,time:'4د',date:'٢٠٢٦/٣/٣',type:'homework'},
+  ];
+  const library=[
+    {id:1,title:'شرح قواعد النحو - الفاعل والمفعول',type:'video',subject:'لغتي',desc:'فيديو شرح مبسط',url:'#',teacherId:1},
+    {id:2,title:'ملزمة الإملاء المكثفة',type:'pdf',subject:'لغتي',desc:'PDF شامل لقواعد الإملاء',url:'#',teacherId:1},
+    {id:3,title:'موقع مراجعة اللغة العربية',type:'link',subject:'لغتي',desc:'رابط مفيد للمراجعة',url:'#',teacherId:1},
+  ];
+  const gifts=[
+    {id:1,name:'نجمة ذهبية ⭐',points:50,desc:'شارة تميز للطالب المتفوق'},
+    {id:2,name:'بطل الأسبوع 🏆',points:100,desc:'تكريم أفضل طالب هذا الأسبوع'},
+    {id:3,name:'شهادة تقدير 📜',points:200,desc:'شهادة رقمية يمكن طباعتها'},
+    {id:4,name:'تاج الفصل 👑',points:300,desc:'لقب يظهر بجانب اسم الطالب'},
+  ];
+  const students=[
+    {name:'أحمد محمد العتيبي',classId:1,points:135},
+    {name:'سارة خالد العمري',classId:1,points:180},
+    {name:'خالد عبدالله الغامدي',classId:1,points:70},
+    {name:'نورة سعد الزهراني',classId:1,points:80},
+  ];
+  localStorage.setItem('classes',JSON.stringify(classes));
+  localStorage.setItem('tests',JSON.stringify(tests));
+  localStorage.setItem('results',JSON.stringify(results));
+  localStorage.setItem('library',JSON.stringify(library));
+  localStorage.setItem('gifts',JSON.stringify(gifts));
+  localStorage.setItem('students',JSON.stringify(students));
+  localStorage.setItem('initialized','1');
+}
+// ترقية: قائمة معلمين لمن لديهم بيانات قديمة بدون teachers
+if(!localStorage.getItem('teachers')){
+  localStorage.setItem('teachers',JSON.stringify([
+    {id:1,name:'فهد عليان العنزي',email:'demo',username:'demo',password:'123456',subject:'لغتي',grade:'الثالث المتوسط',points:0}
+  ]));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>منصتي — التحديات</title>
+<link rel="stylesheet" href="css/style.css?v=20260406">
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main-content">
+  <div class="topbar">
+    <div class="topbar-title">
+      <h1>⚡ التحديات</h1>
+      <p>تحديات سريعة، لوحة صدارة، ومتابعة المشاركات</p>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="btn btn-gold" style="padding:10px 18px;font-size:13px" onclick="openModal('modal-new-challenge')">+ تحدي جديد</button>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="stats-row anim-fadeup">
+      <div class="stat-card s4"><div class="stat-icon">⚡</div><div class="stat-val" id="total-challenges">0</div><div class="stat-lbl">تحديات منشورة</div></div>
+      <div class="stat-card s1"><div class="stat-icon">🏆</div><div class="stat-val" id="total-winners">0</div><div class="stat-lbl">طلاب متصدرون</div></div>
+      <div class="stat-card s2"><div class="stat-icon">📊</div><div class="stat-val" id="avg-challenge">0%</div><div class="stat-lbl">متوسط النتائج</div></div>
+      <div class="stat-card s3"><div class="stat-icon">🎯</div><div class="stat-val" id="pass-rate">0%</div><div class="stat-lbl">نسبة النجاح</div></div>
+    </div>
+
+    <div class="challenges-split mt-18">
+      <div class="card" style="height:100%">
+        <div class="card-header">
+          <div class="card-title">🏆 لوحة الصدارة</div>
+          <span style="font-size:12px;color:var(--text3)">مجمّع من كل التحديات</span>
+        </div>
+        <div class="card-body" id="leaderboard-list" style="padding-top:12px"></div>
+      </div>
+
+      <div class="card" style="height:100%">
+        <div class="card-header">
+          <div class="card-title">⚡ التحديات النشطة</div>
+          <span style="font-size:12px;color:var(--text3)">ما يظهر لطلابك الآن</span>
+        </div>
+        <div class="card-body" id="challenges-list" style="padding-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- نتائج التحديات -->
+    <div class="card mt-24">
+      <div class="card-header"><div class="card-title">📊 نتائج التحديات</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>الطالب</th><th>التحدي</th><th>الفصل</th><th>النتيجة</th><th>الوقت</th><th>التاريخ</th></tr></thead>
+          <tbody id="challenge-results"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal تحدي جديد -->
+<div class="modal-overlay" id="modal-new-challenge">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">⚡ إنشاء تحدي جديد</div>
+      <div class="modal-close" onclick="closeModal('modal-new-challenge')">✕</div>
+    </div>
+    <div id="challenge-alert" class="hidden"></div>
+    <div class="form-group">
+      <label class="form-label">اسم التحدي</label>
+      <input type="text" class="form-input" id="ch-title" placeholder="مثال: تحدي الإملاء الأسبوعي ⚡">
+    </div>
+    <div class="form-group">
+      <label class="form-label">الفصل</label>
+      <select class="form-input" id="ch-class"><option value="">اختر الفصل...</option></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">مدة التحدي (دقائق)</label>
+      <input type="number" class="form-input" id="ch-duration" value="10" min="1">
+    </div>
+    <div class="hint-box hint-box-amber" style="margin-bottom:20px">
+      💡 بعد «إنشاء التحدي» ستُوجَّه لصفحة الأسئلة. هناك اختر نوع «تحدي» وأضف الأسئلة ثم انشر.
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-gold" onclick="createChallenge()" style="flex:1">إنشاء التحدي ⚡</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-new-challenge')" style="flex:1">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const teacher=checkAuth();
+document.getElementById('sidebar-container').innerHTML=getSidebar('challenges');
+
+function load(){
+  const classes=JSON.parse(localStorage.getItem('classes')||'[]').filter(c=>c.teacherId===(teacher.id||1));
+  const tests=JSON.parse(localStorage.getItem('tests')||'[]');
+  const results=JSON.parse(localStorage.getItem('results')||'[]');
+
+  const challenges=tests.filter(t=>t.type==='challenge'&&classes.find(c=>c.id===t.classId));
+  const cResults=results.filter(r=>r.type==='challenge');
+
+  document.getElementById('total-challenges').textContent=challenges.length;
+  document.getElementById('total-winners').textContent=[...new Set(cResults.map(r=>r.studentName))].length;
+  const avg=cResults.length?Math.round(cResults.reduce((s,r)=>s+r.score,0)/cResults.length):0;
+  document.getElementById('avg-challenge').textContent=avg+'%';
+  document.getElementById('pass-rate').textContent=cResults.length?Math.round(cResults.filter(r=>r.score>=60).length/cResults.length*100)+'%':'0%';
+
+  // populate select
+  const sel=document.getElementById('ch-class');
+  sel.innerHTML='<option value="">اختر الفصل...</option>';
+  classes.forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`);
+
+  // لوحة الصدارة
+  const sm={};
+  cResults.forEach(r=>{if(!sm[r.studentName])sm[r.studentName]=[];sm[r.studentName].push(r.score);});
+  const leaderboard=Object.entries(sm).map(([n,s])=>({n,avg:Math.round(s.reduce((a,b)=>a+b)/s.length),count:s.length})).sort((a,b)=>b.avg-a.avg);
+  const medals=['🥇','🥈','🥉'];
+  const ll=document.getElementById('leaderboard-list');
+  if(!leaderboard.length){ll.innerHTML=`<div class="empty-state"><div class="empty-icon">🏆</div><p>لا توجد نتائج بعد</p></div>`;}
+  else ll.innerHTML=leaderboard.map((s,i)=>`
+    <div class="rank-row">
+      <div class="rank-num ${i<3?'rank-'+(i+1):'rank-other'}">${medals[i]||i+1}</div>
+      <div class="rank-name">${s.n.split(' ').slice(0,2).join(' ')}<br><small style="color:var(--text3);font-size:11px">${s.count} تحديات</small></div>
+      <div class="rank-score ${getScoreClass(s.avg)}">${s.avg}%</div>
+    </div>`).join('');
+
+  // التحديات
+  const cl=document.getElementById('challenges-list');
+  const active=challenges.filter(t=>t.active);
+  if(!active.length){cl.innerHTML=`<div class="empty-state"><div class="empty-icon">⚡</div><p>لا توجد تحديات نشطة</p><small>أنشئ تحدياً الآن</small></div>`;}
+  else cl.innerHTML=active.map(t=>{
+    const cls=classes.find(c=>c.id===t.classId);
+    const tr=cResults.filter(r=>r.testId===t.id);
+    return `<div class="challenge-card" style="margin-bottom:14px">
+      <div class="challenge-header">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:var(--text)">⚡ ${t.title}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:3px">${cls?.name||'—'} • ${t.questions.length} سؤال</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:20px;font-weight:900;color:var(--warning)">${tr.length}</div>
+          <div style="font-size:11px;color:var(--text3)">مشارك</div>
+        </div>
+      </div>
+      <div class="challenge-body">
+        ${tr.slice(0,3).map((r,i)=>`<div class="rank-row"><div class="rank-num ${i<3?'rank-'+(i+1):'rank-other'}">${medals[i]||i+1}</div><div class="rank-name">${r.studentName.split(' ').slice(0,2).join(' ')}</div><div class="rank-score ${getScoreClass(r.score)}">${r.score}%</div></div>`).join('')}
+        ${!tr.length?`<div style="text-align:center;color:var(--text3);font-size:13px;padding:16px">لا مشاركات بعد</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // نتائج
+  const cr2=document.getElementById('challenge-results');
+  if(!cResults.length){cr2.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text3)">لا توجد نتائج بعد</td></tr>`;}
+  else cr2.innerHTML=cResults.slice().reverse().map(r=>{
+    const cls=classes.find(c=>c.id===r.classId);
+    const t=tests.find(x=>x.id===r.testId);
+    return `<tr>
+      <td style="font-weight:600;color:var(--text)">${r.studentName}</td>
+      <td>${t?.title||'—'}</td>
+      <td>${cls?.name||'—'}</td>
+      <td><span class="${getScoreClass(r.score)}">${r.score}%</span></td>
+      <td style="color:var(--text3)">${r.time}</td>
+      <td style="color:var(--text3)">${r.date}</td>
+    </tr>`;
+  }).join('');
+}
+
+function createChallenge(){
+  const title=document.getElementById('ch-title').value.trim();
+  const classId=parseInt(document.getElementById('ch-class').value);
+  if(!title||!classId){showAlert('challenge-alert','أدخل الاسم والفصل','error');return;}
+  closeModal('modal-new-challenge');
+  window.location.href=`tests.html?classId=${classId}&type=challenge&title=${encodeURIComponent(title)}`;
+}
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "mansati",
+  "private": true,
+  "description": "منصة تعليمية — خادم محلي للتجربة",
+  "scripts": {
+    "start": "node dev-server.mjs",
+    "dev": "node dev-server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

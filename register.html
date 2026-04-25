@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصتي — إنشاء حساب معلم</title>
+  <link rel="stylesheet" href="css/style.css?v=20260406">
+</head>
+<body>
+<div class="login-page">
+  <div class="login-bg-orb orb1"></div>
+  <div class="login-bg-orb orb2"></div>
+  <div class="login-bg-orb orb3"></div>
+
+  <div class="login-card anim-fadeup" style="width:460px">
+    <div class="login-logo">
+      <div class="login-logo-icon">م</div>
+      <h1>حساب معلم جديد</h1>
+      <p>أنشئ حسابك وابدأ بإدارة فصولك</p>
+    </div>
+
+    <div id="reg-alert" class="hidden"></div>
+
+    <div class="form-group">
+      <label class="form-label">الاسم الكامل</label>
+      <input type="text" class="form-input" id="r-name" placeholder="اسمك كما يظهر للطلاب" autocomplete="name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">البريد أو اسم المستخدم</label>
+      <input type="text" class="form-input" id="r-email" placeholder="يُستخدم لتسجيل الدخول" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label class="form-label">كلمة المرور</label>
+      <input type="password" class="form-input" id="r-pass" placeholder="6 أحرف على الأقل" autocomplete="new-password" minlength="6">
+    </div>
+    <div class="form-group">
+      <label class="form-label">المادة</label>
+      <input type="text" class="form-input" id="r-subject" placeholder="مثال: لغتي">
+    </div>
+    <div class="form-group">
+      <label class="form-label">المرحلة الدراسية</label>
+      <input type="text" class="form-input" id="r-grade" placeholder="مثال: الثالث المتوسط">
+    </div>
+
+    <button type="button" class="btn-login" onclick="register()">إنشاء الحساب ✨</button>
+    <div class="login-footer" style="margin-top:18px">
+      لديك حساب؟ <a href="index.html">تسجيل الدخول</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function show(msg, type) {
+  const b = document.getElementById('reg-alert');
+  b.className = `alert alert-${type}`;
+  b.textContent = (type === 'success' ? '✅ ' : '❌ ') + msg;
+  b.classList.remove('hidden');
+  if (type === 'success') setTimeout(() => b.classList.add('hidden'), 2500);
+}
+
+function register() {
+  const name = document.getElementById('r-name').value.trim();
+  const email = document.getElementById('r-email').value.trim();
+  const pass = document.getElementById('r-pass').value;
+  const subject = document.getElementById('r-subject').value.trim();
+  const grade = document.getElementById('r-grade').value.trim();
+
+  if (!name || !email || !pass) {
+    show('أكمل الحقول المطلوبة', 'error');
+    return;
+  }
+  if (pass.length < 6) {
+    show('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
+    return;
+  }
+
+  let teachers = JSON.parse(localStorage.getItem('teachers') || '[]');
+  if (teachers.some(t => t.email === email || t.username === email)) {
+    show('هذا البريد أو الاسم مستخدم مسبقاً', 'error');
+    return;
+  }
+
+  const id = Date.now();
+  const teacher = {
+    id,
+    name,
+    email,
+    username: email,
+    password: pass,
+    subject: subject || 'معلم',
+    grade: grade || '',
+    points: 0
+  };
+  teachers.push(teacher);
+  localStorage.setItem('teachers', JSON.stringify(teachers));
+  show('تم إنشاء الحساب! جاري التوجيه…', 'success');
+  setTimeout(() => { window.location.href = 'index.html'; }, 900);
+}
+</script>
+</body>
+</html>

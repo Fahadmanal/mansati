@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصتي — المكتبة</title>
+  <link rel="stylesheet" href="css/style.css?v=20260406">
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main-content">
+  <div class="topbar">
+    <div class="topbar-title">
+      <h1>📖 المكتبة التعليمية</h1>
+      <p>فيديوهات، ملفات، وروابط تساعد طلابك على المراجعة</p>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="btn btn-teal" style="padding:10px 18px;font-size:13px" onclick="openModal('modal-add-lib')">+ إضافة مورد</button>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="library-page-grid" id="library-grid"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-add-lib">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📎 مورد جديد</div>
+      <div class="modal-close" onclick="closeModal('modal-add-lib')">✕</div>
+    </div>
+    <div id="lib-alert" class="hidden"></div>
+    <div class="form-group">
+      <label class="form-label">العنوان</label>
+      <input type="text" class="form-input" id="lib-title" placeholder="عنوان المورد">
+    </div>
+    <div class="form-group">
+      <label class="form-label">النوع</label>
+      <select class="form-input" id="lib-type">
+        <option value="video">🎬 فيديو</option>
+        <option value="pdf">📄 PDF / ملف</option>
+        <option value="link">🔗 رابط</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">المادة</label>
+      <input type="text" class="form-input" id="lib-subject" placeholder="مثال: لغتي">
+    </div>
+    <div class="form-group">
+      <label class="form-label">وصف قصير</label>
+      <input type="text" class="form-input" id="lib-desc" placeholder="وصف اختياري">
+    </div>
+    <div class="form-group">
+      <label class="form-label">الرابط</label>
+      <input type="url" class="form-input" id="lib-url" placeholder="https://...">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button type="button" class="btn btn-primary" style="flex:1" onclick="addLibItem()">حفظ</button>
+      <button type="button" class="btn btn-secondary" style="flex:1" onclick="closeModal('modal-add-lib')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const teacher = checkAuth();
+document.getElementById('sidebar-container').innerHTML = getSidebar('library');
+
+const typeEmoji = { video: '🎬', pdf: '📄', link: '🔗' };
+
+function loadLibrary() {
+  const items = JSON.parse(localStorage.getItem('library') || '[]').filter(x => x.teacherId === (teacher.id || 1));
+  const grid = document.getElementById('library-grid');
+  if (!items.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1"><div class="empty-state"><div class="empty-icon">📖</div><p>المكتبة فارغة</p><small>أضف فيديوهات أو ملفات أو روابط مفيدة</small></div></div>`;
+    return;
+  }
+  grid.innerHTML = items.map(it => {
+    const em = typeEmoji[it.type] || '📎';
+    const thumb = it.type === 'pdf' ? 'pdf' : it.type === 'link' ? 'link' : 'video';
+    const u = it.url || '#';
+    return `<div class="library-card" role="link" tabindex="0" onclick="window.open(${JSON.stringify(u)},'_blank')">
+      <div class="library-thumb lib-type-${thumb}">${em}</div>
+      <div class="library-info">
+        <div class="library-title">${it.title.replace(/</g, '&lt;')}</div>
+        <div class="library-meta">${(it.subject || '').replace(/</g, '&lt;')}${it.desc ? ' · ' + it.desc.replace(/</g, '&lt;') : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addLibItem() {
+  const title = document.getElementById('lib-title').value.trim();
+  const type = document.getElementById('lib-type').value;
+  const subject = document.getElementById('lib-subject').value.trim();
+  const desc = document.getElementById('lib-desc').value.trim();
+  const url = document.getElementById('lib-url').value.trim() || '#';
+  if (!title) { showAlert('lib-alert', 'أدخل عنواناً', 'error'); return; }
+  const library = JSON.parse(localStorage.getItem('library') || '[]');
+  library.push({
+    id: Date.now(),
+    title,
+    type,
+    subject,
+    desc,
+    url,
+    teacherId: teacher.id || 1
+  });
+  localStorage.setItem('library', JSON.stringify(library));
+  closeModal('modal-add-lib');
+  ['lib-title', 'lib-subject', 'lib-desc', 'lib-url'].forEach(id => { document.getElementById(id).value = ''; });
+  loadLibrary();
+}
+
+loadLibrary();
+</script>
+</body>
+</html>

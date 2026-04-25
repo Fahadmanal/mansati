@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصتي — بوابة الطالب</title>
+  <link rel="stylesheet" href="css/style.css?v=20260406">
+  <style>
+    body { background: linear-gradient(160deg, #F0EBFA 0%, #E8F4FC 50%, #F5F2FB 100%); min-height: 100vh; }
+    .student-wrap { max-width: 700px; margin: 0 auto; padding: 24px 16px; }
+    .student-header {
+      background: var(--primary);
+      color: #fff;
+      border-radius: 16px 16px 0 0;
+      padding: 20px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .test-card { background: #fff; border-radius: 14px; padding: 20px; margin-bottom: 14px; box-shadow: var(--shadow); border: 1px solid var(--border); cursor: pointer; transition: transform 0.2s; }
+    .test-card:hover { transform: translateY(-2px); }
+    .result-screen { background: #fff; border-radius: 0 0 16px 16px; padding: 40px 24px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="student-wrap">
+    <!-- شاشة تسجيل دخول الطالب -->
+    <div id="screen-login">
+      <div style="text-align:center;padding:40px 0 24px;">
+        <div style="font-size:56px;margin-bottom:12px;">🎓</div>
+        <h1 style="color:var(--text);font-size:24px;font-weight:800;">بوابة الطالب</h1>
+        <p style="color:var(--text3);font-size:14px;">أدخل معلوماتك للوصول لفصلك</p>
+      </div>
+      <div class="login-card" style="max-width:400px;margin:0 auto;">
+        <div id="login-alert" class="hidden"></div>
+        <div class="form-group">
+          <label class="form-label">اسمك الكامل</label>
+          <input type="text" class="form-input" id="s-name" placeholder="أدخل اسمك">
+        </div>
+        <div class="form-group">
+          <label class="form-label">كود الفصل</label>
+          <input type="text" class="form-input" id="s-code"
+            placeholder="ABC123"
+            style="text-align:center;font-size:24px;font-weight:800;letter-spacing:6px;text-transform:uppercase;"
+            oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <button class="login-btn" onclick="studentLogin()" style="background:var(--info);">دخول الفصل 🚀</button>
+      </div>
+    </div>
+
+    <!-- شاشة الفصل -->
+    <div id="screen-class" class="hidden">
+      <div class="student-header">
+        <div>
+          <div style="font-size:18px;font-weight:700;" id="s-welcome">أهلاً</div>
+          <div style="font-size:13px;opacity:0.8;" id="s-class-name">الفصل</div>
+        </div>
+        <button onclick="studentLogout()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:8px 14px;border-radius:10px;cursor:pointer;font-size:13px;">خروج</button>
+      </div>
+      <div style="background:#fff;padding:16px 20px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;gap:16px;font-size:13px;color:var(--text-muted);">
+          <span>📝 <span id="s-test-count">0</span> اختبار متاح</span>
+          <span>✅ <span id="s-done-count">0</span> مكتمل</span>
+        </div>
+      </div>
+      <div id="tests-list-student" style="background:#fff;border-radius:0 0 16px 16px;padding:16px;"></div>
+    </div>
+
+    <!-- شاشة الاختبار -->
+    <div id="screen-test" class="hidden">
+      <div class="student-header">
+        <div>
+          <div style="font-size:16px;font-weight:700;" id="t-title">الاختبار</div>
+          <div style="font-size:13px;opacity:0.8;">السؤال <span id="t-current">1</span> من <span id="t-total">1</span></div>
+        </div>
+        <div id="timer-box" style="background:rgba(255,255,255,0.2);padding:8px 14px;border-radius:10px;font-size:16px;font-weight:700;font-family:monospace;">⏱️ --:--</div>
+      </div>
+
+      <!-- شريط التقدم -->
+      <div style="background:#fff;padding:12px 20px;">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      </div>
+
+      <div id="question-area" style="background:#fff;"></div>
+
+      <div style="background:#fff;border-radius:0 0 16px 16px;padding:16px;display:flex;gap:10px;border-top:1px solid var(--border);">
+        <button class="btn-secondary" id="btn-prev" onclick="prevQ()" style="flex:1;" disabled>→ السابق</button>
+        <button class="btn-primary"   id="btn-next" onclick="nextQ()" style="flex:1;">التالي ←</button>
+        <button class="btn-primary"   id="btn-submit" onclick="submitTest()" style="flex:1;display:none;background:var(--success);">✅ إرسال الاختبار</button>
+      </div>
+    </div>
+
+    <!-- شاشة النتيجة -->
+    <div id="screen-result" class="hidden">
+      <div class="student-header"><div style="font-size:16px;font-weight:700;">نتيجة الاختبار</div></div>
+      <div class="result-screen">
+        <div id="result-emoji" style="font-size:72px;margin-bottom:16px;">🎉</div>
+        <div id="result-score" style="font-size:56px;font-weight:900;color:var(--primary);margin-bottom:8px;">0%</div>
+        <div id="result-msg" style="font-size:16px;color:var(--text-muted);margin-bottom:24px;"></div>
+        <div id="result-details" style="background:var(--bg);border-radius:12px;padding:16px;margin-bottom:24px;text-align:right;"></div>
+        <button class="btn-primary" onclick="goBack()" style="width:100%;">🔙 العودة للفصل</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  let currentStudent = JSON.parse(localStorage.getItem('currentStudent')||'null');
+  let currentTest = null, currentQIndex = 0, answers = {}, timerInterval = null;
+  const questionTypeText = { mcq: 'اختيار متعدد', essay: 'مقالي', compare: 'مقارنة' };
+
+  function showScreen(id) {
+    ['login','class','test','result'].forEach(s => document.getElementById('screen-'+s).classList.add('hidden'));
+    document.getElementById('screen-'+id).classList.remove('hidden');
+  }
+
+  /** يضيف الطالب لقائمة الفصل في localStorage (لتظهر أسماؤهم عند المعلم) */
+  function registerStudentIfNeeded(st) {
+    if (!st || !st.name || st.classId == null) return st;
+    const cid = Number(st.classId);
+    const students = JSON.parse(localStorage.getItem('students')||'[]');
+    if (!students.some(s => s.name === st.name && Number(s.classId) === cid)) {
+      students.push({ name: st.name, classId: cid, addedAt: new Date().toISOString() });
+      localStorage.setItem('students', JSON.stringify(students));
+      const cs = JSON.parse(localStorage.getItem('classes')||'[]');
+      const ci = cs.findIndex(c => Number(c.id) === cid);
+      if (ci !== -1) {
+        cs[ci].studentCount = students.filter(s => Number(s.classId) === cid).length;
+        localStorage.setItem('classes', JSON.stringify(cs));
+      }
+    }
+    const normalized = { ...st, classId: cid };
+    localStorage.setItem('currentStudent', JSON.stringify(normalized));
+    return normalized;
+  }
+
+  function studentLogin() {
+    const name = document.getElementById('s-name').value.trim();
+    const code = document.getElementById('s-code').value.trim().toUpperCase();
+    if (!name || !code) { showLoginAlert('يرجى تعبئة الاسم والكود','error'); return; }
+    const classes = JSON.parse(localStorage.getItem('classes')||'[]');
+    const cls = classes.find(c=>c.code===code);
+    if (!cls) { showLoginAlert('كود الفصل غير صحيح','error'); return; }
+    currentStudent = { name, classId: cls.id, className: cls.name, code };
+    currentStudent = registerStudentIfNeeded(currentStudent);
+    loadClassScreen();
+  }
+
+  function showLoginAlert(msg, type) {
+    const a = document.getElementById('login-alert');
+    a.className = `alert alert-${type}`;
+    a.textContent = type==='error'?'❌ '+msg:'✅ '+msg;
+    a.classList.remove('hidden');
+    setTimeout(()=>a.classList.add('hidden'),3000);
+  }
+
+  function loadClassScreen() {
+    if(!currentStudent){showScreen('login');return;}
+    const cid = Number(currentStudent.classId);
+    document.getElementById('s-welcome').textContent = `أهلاً، ${currentStudent.name}`;
+    document.getElementById('s-class-name').textContent = currentStudent.className;
+    const tests = JSON.parse(localStorage.getItem('tests')||'[]').filter(t=>Number(t.classId)===cid && t.active);
+    const results = JSON.parse(localStorage.getItem('results')||'[]').filter(r=>r.studentName===currentStudent.name&&Number(r.classId)===cid);
+    const doneIds = results.map(r=>r.testId);
+    document.getElementById('s-test-count').textContent = tests.length;
+    document.getElementById('s-done-count').textContent = doneIds.length;
+    const typeMap = {test:'📝',challenge:'⚡',homework:'📖'};
+    const typeAr  = {test:'اختبار',challenge:'تحدي',homework:'واجب'};
+    const bm = {test:'badge-test',challenge:'badge-challenge',homework:'badge-homework'};
+    const list = document.getElementById('tests-list-student');
+    if(tests.length===0){
+      list.innerHTML=`<div style="text-align:center;padding:40px;color:var(--text-muted)"><div style="font-size:48px">📭</div><p>لا توجد اختبارات متاحة حالياً</p></div>`;
+    } else {
+      list.innerHTML = tests.map(t=>{
+        const done = doneIds.includes(t.id);
+        const res  = results.find(r=>r.testId===t.id);
+        return `<div class="test-card" onclick="${done?'':'startTest('+t.id+')'}">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:15px;font-weight:700;">${typeMap[t.type]||'📝'} ${t.title}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${t.questions.length} سؤال${t.duration?' • '+t.duration+' دقيقة':''}</div>
+            </div>
+            ${done
+              ? `<div style="text-align:center">${
+                  res.needsManualReview
+                    ? `<div style="font-size:12px;font-weight:700;color:var(--warning)">بانتظار التصحيح</div><div style="font-size:11px;color:var(--text-muted)">مكتمل</div>`
+                    : `<div style="font-size:20px;font-weight:800;color:${res.score>=80?'var(--success)':res.score>=60?'var(--warning)':'var(--danger)'}">${res.score}%</div><div style="font-size:11px;color:var(--text-muted)">مكتمل</div>`
+                }</div>`
+              : `<button class="btn-primary" style="padding:8px 16px;font-size:13px;">ابدأ الآن</button>`
+            }
+          </div>
+        </div>`;
+      }).join('');
+    }
+    showScreen('class');
+  }
+
+  function startTest(testId) {
+    const tests = JSON.parse(localStorage.getItem('tests')||'[]');
+    currentTest = tests.find(t=>t.id===testId);
+    if(!currentTest) return;
+    currentQIndex = 0; answers = {};
+    document.getElementById('t-title').textContent = currentTest.title;
+    document.getElementById('t-total').textContent = currentTest.questions.length;
+    if(currentTest.duration>0) startTimer(currentTest.duration*60);
+    renderQuestion();
+    showScreen('test');
+  }
+
+  function renderQuestion() {
+    const q = currentTest.questions[currentQIndex];
+    const kind = q.kind || 'mcq';
+    const total = currentTest.questions.length;
+    document.getElementById('t-current').textContent = currentQIndex+1;
+    document.getElementById('progress-fill').style.width = ((currentQIndex+1)/total*100)+'%';
+    document.getElementById('btn-prev').disabled = currentQIndex===0;
+    const isLast = currentQIndex===total-1;
+    document.getElementById('btn-next').style.display   = isLast?'none':'block';
+    document.getElementById('btn-submit').style.display = isLast?'block':'none';
+    document.getElementById('question-area').innerHTML = `
+      <div class="question-block">
+        <div class="question-text">${currentQIndex+1}. ${q.text}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin:8px 0 12px;">نوع السؤال: ${questionTypeText[kind] || 'اختيار متعدد'}</div>
+        ${kind === 'mcq'
+          ? (q.options || []).map((opt,i)=>`
+              <label class="answer-option ${answers[currentQIndex]===i?'selected':''}" onclick="selectAnswer(${i})">
+                <input type="radio" name="qa" value="${i}" ${answers[currentQIndex]===i?'checked':''} style="accent-color:var(--primary);">
+                <span>${['أ','ب','ج','د'][i] || `${i+1}`}. ${opt}</span>
+              </label>
+            `).join('')
+          : `
+            <textarea class="form-input" rows="6" placeholder="${kind === 'compare' ? 'اكتب المقارنة هنا...' : 'اكتب إجابتك هنا...'}" oninput="setTextAnswer(this.value)">${typeof answers[currentQIndex] === 'string' ? answers[currentQIndex] : ''}</textarea>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:8px;">سيتم تقييم هذا النوع من الأسئلة يدويًا بواسطة المعلم.</div>
+          `
+        }
+      </div>
+    `;
+  }
+
+  function selectAnswer(i) { answers[currentQIndex]=i; renderQuestion(); }
+  function setTextAnswer(value) { answers[currentQIndex] = value.trim(); }
+  function nextQ() { if(currentQIndex<currentTest.questions.length-1){currentQIndex++;renderQuestion();} }
+  function prevQ() { if(currentQIndex>0){currentQIndex--;renderQuestion();} }
+
+  function submitTest() {
+    clearInterval(timerInterval);
+    let correct = 0;
+    let autoTotal = 0;
+    currentTest.questions.forEach((q,i)=>{
+      const kind = q.kind || 'mcq';
+      if (kind === 'mcq') {
+        autoTotal++;
+        if (answers[i] === q.correct) correct++;
+      }
+    });
+    const score = autoTotal > 0 ? Math.round(correct/autoTotal*100) : 0;
+    const needsManualReview = currentTest.questions.length > autoTotal;
+    const now = new Date();
+    const result = {
+      studentName: currentStudent.name,
+      classId: currentStudent.classId,
+      testId: currentTest.id,
+      score, correct,
+      total: autoTotal,
+      totalQuestions: currentTest.questions.length,
+      needsManualReview,
+      type: currentTest.type,
+      answers,
+      time: '—',
+      date: `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()}`
+    };
+    const results = JSON.parse(localStorage.getItem('results')||'[]');
+    results.push(result);
+    localStorage.setItem('results',JSON.stringify(results));
+    showResult(result);
+  }
+
+  function showResult(r) {
+    if (r.needsManualReview) {
+      const autoText = r.total > 0 ? `${r.score}%` : '—';
+      document.getElementById('result-emoji').textContent = '🕒';
+      document.getElementById('result-score').textContent = autoText;
+      document.getElementById('result-msg').textContent = r.total > 0
+        ? 'تم التصحيح التلقائي لأسئلة الاختيار، وباقي الأسئلة بانتظار التصحيح اليدوي.'
+        : 'إجاباتك أُرسلت، والنتيجة ستكون بعد التصحيح اليدوي من المعلم.';
+      document.getElementById('result-details').innerHTML = `
+        <div style="display:flex;justify-content:space-around;">
+          <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--success)">${r.correct}</div><div style="font-size:12px;color:var(--text-muted)">صحيحة تلقائيًا</div></div>
+          <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--warning)">${(r.totalQuestions || 0)-r.total}</div><div style="font-size:12px;color:var(--text-muted)">بانتظار التصحيح</div></div>
+          <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--primary)">${r.totalQuestions || r.total}</div><div style="font-size:12px;color:var(--text-muted)">إجمالي الأسئلة</div></div>
+        </div>
+      `;
+      showScreen('result');
+      return;
+    }
+    const emoji = r.score>=80?'🌟':r.score>=60?'👍':'💪';
+    const msg   = r.score>=80?'ممتاز! أداء رائع':r.score>=60?'جيد! يمكنك التحسين':'حاول مرة أخرى!';
+    document.getElementById('result-emoji').textContent = emoji;
+    document.getElementById('result-score').textContent = r.score+'%';
+    document.getElementById('result-msg').textContent = msg;
+    document.getElementById('result-details').innerHTML = `
+      <div style="display:flex;justify-content:space-around;">
+        <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--success)">${r.correct}</div><div style="font-size:12px;color:var(--text-muted)">إجابات صحيحة</div></div>
+        <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--danger)">${r.total-r.correct}</div><div style="font-size:12px;color:var(--text-muted)">إجابات خاطئة</div></div>
+        <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--primary)">${r.total}</div><div style="font-size:12px;color:var(--text-muted)">إجمالي الأسئلة</div></div>
+      </div>
+    `;
+    showScreen('result');
+  }
+
+  function startTimer(seconds) {
+    let remaining = seconds;
+    timerInterval = setInterval(()=>{
+      if(remaining<=0){clearInterval(timerInterval);submitTest();return;}
+      const m=Math.floor(remaining/60), s=remaining%60;
+      document.getElementById('timer-box').textContent=`⏱️ ${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      if(remaining<=60) document.getElementById('timer-box').style.background='rgba(231,76,60,0.5)';
+      remaining--;
+    },1000);
+  }
+
+  function goBack() { loadClassScreen(); }
+  function studentLogout() { localStorage.removeItem('currentStudent'); currentStudent=null; showScreen('login'); }
+
+  // تحميل تلقائي — مهم: من دخل من index.html يجب تسجيله في قائمة الطلاب
+  if (currentStudent) {
+    currentStudent = registerStudentIfNeeded(currentStudent);
+    loadClassScreen();
+  } else showScreen('login');
+</script>
+</body>
+</html>

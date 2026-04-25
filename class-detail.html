@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصتي — تفاصيل الفصل</title>
+  <link rel="stylesheet" href="css/style.css?v=20260406">
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main-content">
+  <div class="topbar">
+    <div class="topbar-title">
+      <h1 id="class-title">الفصل</h1>
+      <p id="class-subtitle">إدارة الاختبارات والطلاب والنتائج</p>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="btn btn-primary" style="padding:10px 18px;font-size:13px" onclick="window.location='tests.html?classId='+classId">+ إضافة اختبار</button>
+    </div>
+  </div>
+
+  <div class="page">
+    <p class="breadcrumb-inline" style="font-size:12px;color:var(--text3);margin:-12px 0 18px">
+      <a href="dashboard.html" style="color:var(--c1);font-weight:600">الرئيسية</a>
+      <span style="margin:0 6px;opacity:0.5">←</span>
+      <a href="classes.html" style="color:var(--c1);font-weight:600">فصولي</a>
+      <span style="margin:0 6px;opacity:0.5">←</span>
+      <span id="class-name-bc">الفصل</span>
+    </p>
+
+    <div class="stats-row stats-row--detail" id="class-info-cards"></div>
+
+    <div class="class-detail-tabs" role="tablist">
+      <button type="button" role="tab" class="class-detail-tab active" id="tb-tests"    aria-selected="true"  onclick="showTab('tests')">📝 الاختبارات</button>
+      <button type="button" role="tab" class="class-detail-tab"        id="tb-students" aria-selected="false" onclick="showTab('students')">👥 الطلاب</button>
+      <button type="button" role="tab" class="class-detail-tab"        id="tb-results"  aria-selected="false" onclick="showTab('results')">📊 النتائج</button>
+    </div>
+
+    <div id="tab-tests" class="class-detail-tab-panel">
+      <div id="tests-list"></div>
+    </div>
+
+    <div id="tab-students" class="class-detail-tab-panel hidden">
+      <div class="section-head-bar">
+        <h2>قائمة الطلاب</h2>
+        <button type="button" class="btn btn-secondary" style="padding:9px 16px;font-size:13px" onclick="openAddStudent()">+ إضافة طالب</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>اسم الطالب</th><th>آخر نشاط</th><th>متوسط النتائج</th><th>إجراءات</th></tr></thead>
+            <tbody id="students-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-results" class="class-detail-tab-panel hidden">
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>الطالب</th><th>الاختبار</th><th>النوع</th><th>النتيجة</th><th>الوقت</th><th>التاريخ</th></tr></thead>
+            <tbody id="class-results-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="add-student-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">إضافة طالب</div>
+      <div class="modal-close" onclick="closeModal('add-student-modal')">✕</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">اسم الطالب</label>
+      <input type="text" class="form-input" id="new-student-name" placeholder="الاسم الكامل">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button type="button" class="btn btn-primary" style="flex:1" onclick="addStudent()">إضافة</button>
+      <button type="button" class="btn btn-secondary" style="flex:1" onclick="closeModal('add-student-modal')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+  const teacher = checkAuth();
+  document.getElementById('sidebar-container').innerHTML = getSidebar('classes');
+
+  const params  = new URLSearchParams(location.search);
+  const classId = parseInt(params.get('id'), 10);
+  const classes = JSON.parse(localStorage.getItem('classes') || '[]');
+  const cls     = classes.find(c => Number(c.id) === classId);
+  if (!cls) window.location.href = 'classes.html';
+
+  document.getElementById('class-title').textContent = cls.name;
+  document.getElementById('class-name-bc').textContent = cls.name;
+  document.getElementById('class-subtitle').textContent = (cls.subject ? cls.subject + ' · ' : '') + 'كود الفصل: ' + cls.code;
+
+  function loadClassData() {
+    const tests   = JSON.parse(localStorage.getItem('tests')   || '[]').filter(t => Number(t.classId) === classId);
+    const results = JSON.parse(localStorage.getItem('results') || '[]').filter(r => Number(r.classId) === classId);
+    const registered = JSON.parse(localStorage.getItem('students') || '[]').filter(s => Number(s.classId) === classId);
+    const seen = new Set(registered.map(s => s.name));
+    const students = [...registered];
+    results.forEach(r => {
+      const n = r.studentName;
+      if (n && !seen.has(n)) { seen.add(n); students.push({ name: n, classId, addedAt: null, inferredFromResults: true }); }
+    });
+    const avg = results.length ? Math.round(results.reduce((s,r)=>s+r.score,0)/results.length) : 0;
+
+    document.getElementById('class-info-cards').innerHTML = `
+      <div class="stat-card stat-card--inline s4">
+        <div class="stat-block">
+          <div class="stat-val">${cls.code}</div>
+          <div class="stat-lbl">كود الفصل</div>
+        </div>
+        <div class="stat-icon">🔑</div>
+      </div>
+      <div class="stat-card stat-card--inline s2">
+        <div class="stat-block">
+          <div class="stat-val">${students.length}</div>
+          <div class="stat-lbl">عدد الطلاب</div>
+        </div>
+        <div class="stat-icon">👥</div>
+      </div>
+      <div class="stat-card stat-card--inline s1">
+        <div class="stat-block">
+          <div class="stat-val">${avg}%</div>
+          <div class="stat-lbl">متوسط الأداء</div>
+        </div>
+        <div class="stat-icon">📈</div>
+      </div>
+    `;
+
+    const typeMap = { test:'📝 اختبار', challenge:'⚡ تحدي', homework:'📖 واجب' };
+    const badgeMap = { test:'badge-test', challenge:'badge-challenge', homework:'badge-homework' };
+    const tl = document.getElementById('tests-list');
+    if (tests.length === 0) {
+      tl.innerHTML = `<div class="class-detail-empty"><div class="empty-icon">📝</div><p style="font-size:15px;color:var(--text2);margin-bottom:6px">لا توجد اختبارات بعد</p><small>استخدم «إضافة اختبار» أعلاه</small></div>`;
+    } else {
+      tl.innerHTML = `<div class="class-activity-list">${tests.map(t => {
+        const tRes = results.filter(r => r.testId === t.id);
+        const tAvg = tRes.length ? Math.round(tRes.reduce((s,r)=>s+r.score,0)/tRes.length) : 0;
+        return `<div class="class-activity-row">
+          <div class="class-activity-main">
+            <span class="class-activity-title">${t.title}</span>
+            <span class="badge ${badgeMap[t.type]||'badge-test'}">${typeMap[t.type]||t.type}</span>
+          </div>
+          <div class="class-activity-meta">
+            <span>❓ ${t.questions.length} سؤال</span>
+            <span>👤 ${tRes.length} إجابة</span>
+            <span>📈 <strong class="${getScoreClass(tAvg)}">${tAvg}%</strong> متوسط</span>
+          </div>
+          <div class="class-activity-actions">
+            <span class="pill-status ${t.active ? 'pill-status--on' : 'pill-status--off'}">${t.active ? '🟢 نشط' : '⏸ متوقف'}</span>
+            <button type="button" class="btn-sm ${t.active ? 'btn-sm-ghost' : 'btn-sm-primary'}" onclick="toggleTest(${t.id})">${t.active ? 'إيقاف' : 'تفعيل'}</button>
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+    }
+
+    const sb = document.getElementById('students-body');
+    if (students.length === 0) {
+      sb.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:28px;">لا يوجد طلاب مسجلون بعد. شارك كود الفصل <strong>${cls.code}</strong> مع طلابك.</td></tr>`;
+    } else {
+      sb.innerHTML = students.map((s,i) => {
+        const sRes = results.filter(r=>r.studentName===s.name);
+        const sAvg = sRes.length ? Math.round(sRes.reduce((a,r)=>a+r.score,0)/sRes.length) : '—';
+        const delBtn = s.inferredFromResults
+          ? `<span style="color:var(--text3);font-size:11px;">من النتائج</span>`
+          : `<button type="button" onclick="removeStudent(${JSON.stringify(s.name)})" style="color:var(--danger);background:none;border:none;cursor:pointer;font-size:12px;">حذف</button>`;
+        return `<tr>
+          <td>${i+1}</td>
+          <td style="font-weight:600;color:var(--text)">${s.name}</td>
+          <td style="color:var(--text3)">${s.lastActive||'—'}</td>
+          <td>${sAvg !== '—' ? `<span class="${sAvg>=80?'score-high':sAvg>=60?'score-mid':'score-low'}">${sAvg}%</span>` : '—'}</td>
+          <td>${delBtn}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    const rb = document.getElementById('class-results-body');
+    if (results.length === 0) {
+      rb.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:28px;">لا توجد نتائج بعد</td></tr>`;
+    } else {
+      const typeAr = {test:'اختبار',challenge:'تحدي',homework:'واجب'};
+      const bm = {test:'badge-test',challenge:'badge-challenge',homework:'badge-homework'};
+      rb.innerHTML = results.slice().reverse().map(r => {
+        const t = tests.find(x=>x.id===r.testId);
+        const sc = r.score>=80?'score-high':r.score>=60?'score-mid':'score-low';
+        return `<tr>
+          <td style="font-weight:600">${r.studentName}</td>
+          <td>${t?.title||'—'}</td>
+          <td><span class="badge ${bm[r.type]||'badge-test'}">${typeAr[r.type]||r.type}</span></td>
+          <td><span class="${sc}">${r.score}%</span></td>
+          <td style="color:var(--text3)">${r.time||'—'}</td>
+          <td style="color:var(--text3)">${r.date}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  function showTab(tab) {
+    ['tests','students','results'].forEach(t => {
+      document.getElementById('tab-'+t).classList.toggle('hidden', t !== tab);
+      const btn = document.getElementById('tb-'+t);
+      btn.classList.toggle('active', t === tab);
+      btn.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+    });
+  }
+
+  function toggleTest(id) {
+    const tests = JSON.parse(localStorage.getItem('tests')||'[]');
+    const i = tests.findIndex(t=>t.id===id);
+    if (i !== -1) { tests[i].active = !tests[i].active; localStorage.setItem('tests', JSON.stringify(tests)); }
+    loadClassData();
+  }
+
+  function openAddStudent() { openModal('add-student-modal'); }
+
+  function addStudent() {
+    const name = document.getElementById('new-student-name').value.trim();
+    if (!name) return;
+    const students = JSON.parse(localStorage.getItem('students')||'[]');
+    students.push({name, classId: classId, addedAt: new Date().toISOString()});
+    localStorage.setItem('students', JSON.stringify(students));
+    const classesArr = JSON.parse(localStorage.getItem('classes')||'[]');
+    const ci = classesArr.findIndex(c=>Number(c.id)===classId);
+    const allStudents = JSON.parse(localStorage.getItem('students')||'[]');
+    if (ci !== -1) {
+      classesArr[ci].studentCount = allStudents.filter(s=>Number(s.classId)===classId).length;
+      localStorage.setItem('classes', JSON.stringify(classesArr));
+    }
+    closeModal('add-student-modal');
+    document.getElementById('new-student-name').value='';
+    loadClassData();
+  }
+
+  function removeStudent(name) {
+    if (!confirm(`هل تريد حذف ${name} من الفصل؟`)) return;
+    let students = JSON.parse(localStorage.getItem('students')||'[]');
+    students = students.filter(s=>!(s.name===name&&Number(s.classId)===classId));
+    localStorage.setItem('students', JSON.stringify(students));
+    loadClassData();
+  }
+
+  loadClassData();
+</script>
+</body>
+</html>

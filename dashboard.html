@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>منصتي — لوحة التحكم</title>
+<link rel="stylesheet" href="css/style.css?v=20260406">
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main-content">
+
+  <div class="topbar">
+    <div class="topbar-title">
+      <h1 id="welcome-h">أهلاً 👋</h1>
+      <p id="teacher-sub">جاهز لإلهام طلابك اليوم؟</p>
+    </div>
+    <div class="topbar-actions">
+      <div class="topbar-btn" title="الإشعارات">🔔<span class="notif-dot"></span></div>
+      <a href="tests.html" class="btn btn-primary" style="padding:10px 18px;font-size:13px">+ اختبار جديد</a>
+    </div>
+  </div>
+
+  <div class="page">
+
+    <!-- إحصائيات -->
+    <div class="stats-row anim-fadeup">
+      <div class="stat-card s1">
+        <div class="stat-change up" id="avg-change">↑ هذا الأسبوع</div>
+        <div class="stat-icon">📈</div>
+        <div class="stat-val" id="stat-avg">0%</div>
+        <div class="stat-lbl">متوسط الأداء</div>
+      </div>
+      <div class="stat-card s2">
+        <div class="stat-icon">✅</div>
+        <div class="stat-val" id="stat-tests">0</div>
+        <div class="stat-lbl">اختبارات مكتملة</div>
+      </div>
+      <div class="stat-card s3">
+        <div class="stat-icon">👥</div>
+        <div class="stat-val" id="stat-students">0</div>
+        <div class="stat-lbl">إجمالي الطلاب</div>
+      </div>
+      <div class="stat-card s4">
+        <div class="stat-icon">📚</div>
+        <div class="stat-val" id="stat-classes">0</div>
+        <div class="stat-lbl">الفصول النشطة</div>
+      </div>
+    </div>
+
+    <!-- فصولي -->
+    <div class="flex-between mt-24" style="margin-bottom:16px">
+      <div>
+        <h2 style="font-size:17px;font-weight:800">فصولي</h2>
+        <p style="font-size:12px;color:var(--text3);margin-top:3px">اضغط على فصل لإدارته</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('modal-add-class')">+ إنشاء فصل</button>
+    </div>
+    <div class="class-grid" id="class-grid"></div>
+
+    <!-- جزء سفلي -->
+    <div class="grid-2 mt-24">
+      <!-- آخر النتائج -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⚡ آخر النتائج</div>
+          <a href="reports.html" style="font-size:12px;color:var(--c2)">عرض الكل ←</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>الطالب</th><th>النوع</th><th>النتيجة</th></tr></thead>
+            <tbody id="recent-results"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- أفضل الطلاب -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🏆 أفضل الطلاب</div>
+          <a href="reports.html" style="font-size:12px;color:var(--c2)">التقرير الكامل ←</a>
+        </div>
+        <div class="card-body" id="top-students-list"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal إضافة فصل -->
+<div class="modal-overlay" id="modal-add-class">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✨ إنشاء فصل جديد</div>
+      <div class="modal-close" onclick="closeModal('modal-add-class')">✕</div>
+    </div>
+    <div id="modal-alert" class="hidden"></div>
+    <div class="form-group">
+      <label class="form-label">اسم الفصل</label>
+      <input type="text" class="form-input" id="cls-name" placeholder="مثال: الثالث المتوسط أ">
+    </div>
+    <div class="form-group">
+      <label class="form-label">المادة</label>
+      <input type="text" class="form-input" id="cls-subject" placeholder="لغتي، رياضيات...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">كود الفصل</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="form-input" id="cls-code" placeholder="ABC123" style="text-transform:uppercase;letter-spacing:4px;font-weight:800;font-size:18px;text-align:center">
+        <button onclick="document.getElementById('cls-code').value=generateCode()" style="padding:10px 14px;background:rgba(108,60,247,0.15);border:1px solid rgba(108,60,247,0.3);border-radius:12px;cursor:pointer;font-size:18px;color:var(--c2)" title="توليد كود عشوائي">🔄</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-primary" onclick="addClass()" style="flex:1">إنشاء الفصل 🚀</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-class')" style="flex:1">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const teacher = checkAuth();
+document.getElementById('sidebar-container').innerHTML = getSidebar('dashboard');
+document.getElementById('welcome-h').textContent = `أهلاً، ${teacher.name} 👋`;
+document.getElementById('teacher-sub').textContent = `${teacher.subject||''} | ${teacher.grade||''}`;
+
+function load() {
+  const classes = JSON.parse(localStorage.getItem('classes')||'[]').filter(c=>c.teacherId===(teacher.id||1));
+  const tests   = JSON.parse(localStorage.getItem('tests')||'[]');
+  const results = JSON.parse(localStorage.getItem('results')||'[]');
+  const students= JSON.parse(localStorage.getItem('students')||'[]');
+
+  const totalStudents = classes.reduce((s,c)=>s+(c.studentCount||0),0);
+  const avg = results.length ? Math.round(results.reduce((s,r)=>s+r.score,0)/results.length) : 0;
+
+  document.getElementById('stat-avg').textContent = avg+'%';
+  document.getElementById('stat-tests').textContent = results.length;
+  document.getElementById('stat-students').textContent = totalStudents;
+  document.getElementById('stat-classes').textContent = classes.length;
+
+  // الفصول
+  const grid = document.getElementById('class-grid');
+  if(!classes.length) {
+    grid.innerHTML=`<div style="grid-column:1/-1"><div class="empty-state"><div class="empty-icon">📚</div><p>لا توجد فصول بعد</p><small>أنشئ فصلك الأول الآن</small></div></div>`;
+  } else {
+    grid.innerHTML=classes.map(cls=>{
+      const ct=tests.filter(t=>t.classId===cls.id).length;
+      const cr=results.filter(r=>r.classId===cls.id);
+      const ca=cr.length?Math.round(cr.reduce((s,r)=>s+r.score,0)/cr.length):0;
+      return `<div class="class-card" onclick="window.location='class-detail.html?id=${cls.id}'">
+        <div class="class-card-top"><div class="class-card-top-shapes"></div><div class="class-emoji">📚</div></div>
+        <div class="class-card-body">
+          <div class="class-name">${cls.name}</div>
+          <div class="class-meta">
+            <span>📖 ${cls.subject||'—'}</span>
+            <span>👥 ${cls.studentCount||0} طالب</span>
+            <span>📝 ${ct} اختبار</span>
+          </div>
+          <div class="class-code-pill">
+            <div><div class="code-label">كود الفصل</div><div class="code-val">${cls.code}</div></div>
+            <button class="code-copy" onclick="event.stopPropagation();copyToClipboard('${cls.code}',this)">📋 نسخ</button>
+          </div>
+          <div class="class-actions">
+            <button class="btn-sm btn-sm-primary" onclick="event.stopPropagation();window.location='tests.html?classId=${cls.id}'">+ اختبار</button>
+            <button class="btn-sm btn-sm-ghost" style="flex:0.5;font-size:18px" onclick="event.stopPropagation();deleteClass(${cls.id})">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // آخر النتائج
+  const rb = document.getElementById('recent-results');
+  const last=results.slice(-6).reverse();
+  if(!last.length) rb.innerHTML=`<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text3)">لا توجد نتائج بعد</td></tr>`;
+  else rb.innerHTML=last.map(r=>`<tr>
+    <td style="font-weight:600;color:var(--text)">${r.studentName.split(' ').slice(0,2).join(' ')}</td>
+    <td>${getTypeBadge(r.type)}</td>
+    <td><span class="${getScoreClass(r.score)}">${r.score}%</span></td>
+  </tr>`).join('');
+
+  // أفضل الطلاب
+  const sm={};
+  results.forEach(r=>{if(!sm[r.studentName])sm[r.studentName]=[];sm[r.studentName].push(r.score);});
+  const top=Object.entries(sm).map(([n,s])=>({n,avg:Math.round(s.reduce((a,b)=>a+b,0)/s.length)})).sort((a,b)=>b.avg-a.avg).slice(0,6);
+  const medals=['🥇','🥈','🥉'];
+  const tsl=document.getElementById('top-students-list');
+  if(!top.length) tsl.innerHTML=`<div class="empty-state"><div class="empty-icon">🏆</div><p>لا توجد بيانات</p></div>`;
+  else tsl.innerHTML=top.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(108,60,247,0.08)">
+      <span style="font-size:20px">${medals[i]||'#'+(i+1)}</span>
+      <span style="flex:1;font-size:13px;font-weight:600;color:var(--text)">${s.n.split(' ').slice(0,2).join(' ')}</span>
+      <span class="${getScoreClass(s.avg)}" style="font-size:15px">${s.avg}%</span>
+    </div>`).join('');
+}
+
+function addClass(){
+  const name=document.getElementById('cls-name').value.trim();
+  const subject=document.getElementById('cls-subject').value.trim();
+  const code=document.getElementById('cls-code').value.trim().toUpperCase();
+  if(!name||!code){showAlert('modal-alert','أدخل الاسم والكود على الأقل','error');return}
+  const classes=JSON.parse(localStorage.getItem('classes')||'[]');
+  if(classes.find(c=>c.code===code)){showAlert('modal-alert','هذا الكود مستخدم بالفعل','error');return}
+  classes.push({id:Date.now(),name,subject,code,studentCount:0,teacherId:teacher.id||1});
+  localStorage.setItem('classes',JSON.stringify(classes));
+  closeModal('modal-add-class');
+  document.getElementById('cls-name').value='';
+  document.getElementById('cls-subject').value='';
+  load();
+}
+
+function deleteClass(id){
+  if(!confirm('حذف الفصل وجميع بياناته؟'))return;
+  purgeClassData(id);
+  const c=JSON.parse(localStorage.getItem('classes')||'[]').filter(x=>Number(x.id)!==Number(id));
+  localStorage.setItem('classes',JSON.stringify(c));load();
+}
+
+load();
+// توليد كود مسبقاً
+document.getElementById('cls-code').value=generateCode();
+</script>
+</body>
+</html>

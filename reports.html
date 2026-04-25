@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>منصتي — التقارير</title>
+<link rel="stylesheet" href="css/style.css?v=20260406">
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main-content">
+  <div class="topbar">
+    <div class="topbar-title">
+      <h1>📊 التقارير والنتائج</h1>
+      <p>ملخص الأداء، التوزيع، وسجل الإجابات مع تصفية حسب الفصل</p>
+    </div>
+    <div class="topbar-actions">
+      <select class="form-input" id="filter-class" onchange="load()">
+        <option value="all">جميع الفصول</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="page">
+    <!-- إحصائيات -->
+    <div class="stats-row anim-fadeup">
+      <div class="stat-card s1"><div class="stat-icon">📋</div><div class="stat-val" id="r-total">0</div><div class="stat-lbl">إجمالي الإجابات</div></div>
+      <div class="stat-card s2"><div class="stat-icon">📈</div><div class="stat-val" id="r-avg">0%</div><div class="stat-lbl">متوسط الأداء</div></div>
+      <div class="stat-card s3"><div class="stat-icon">✅</div><div class="stat-val" id="r-pass">0%</div><div class="stat-lbl">نسبة النجاح</div></div>
+      <div class="stat-card s4"><div class="stat-icon">🌟</div><div class="stat-val" id="r-excel">0%</div><div class="stat-lbl">نسبة الامتياز ≥80%</div></div>
+    </div>
+
+    <div class="grid-2 mt-18">
+      <!-- أداء الطلاب -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">🏆 ترتيب الطلاب</div></div>
+        <div class="card-body" id="students-ranking"></div>
+      </div>
+
+      <!-- توزيع الدرجات -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">📊 توزيع الدرجات</div></div>
+        <div class="card-body" id="score-dist"></div>
+      </div>
+    </div>
+
+    <!-- أداء كل اختبار -->
+    <div class="card mt-24">
+      <div class="card-header"><div class="card-title">📝 أداء الاختبارات</div></div>
+      <div class="card-body" id="tests-performance"></div>
+    </div>
+
+    <!-- السجل الكامل -->
+    <div class="card mt-24">
+      <div class="card-header">
+        <div class="card-title">📋 سجل النتائج الكامل</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="form-input" id="search" placeholder="🔍 بحث..." onkeyup="filterTable()" style="padding:8px 12px;font-size:13px;width:180px">
+          <select class="form-input" id="ft-type" onchange="filterTable()" style="padding:8px 12px;font-size:13px;width:auto">
+            <option value="all">الكل</option>
+            <option value="test">اختبارات</option>
+            <option value="challenge">تحديات</option>
+            <option value="homework">واجبات</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>الطالب</th><th>الفصل</th><th>الاختبار</th><th>النوع</th><th>النتيجة</th><th>الوقت</th><th>التاريخ</th></tr></thead>
+          <tbody id="full-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const teacher=checkAuth();
+document.getElementById('sidebar-container').innerHTML=getSidebar('reports');
+let allResults=[],allClasses=[],allTests=[];
+
+function load(){
+  allClasses=JSON.parse(localStorage.getItem('classes')||'[]').filter(c=>c.teacherId===(teacher.id||1));
+  allTests=JSON.parse(localStorage.getItem('tests')||'[]');
+  allResults=JSON.parse(localStorage.getItem('results')||'[]');
+
+  const sel=document.getElementById('filter-class');
+  const existing=[...sel.options].map(o=>o.value);
+  allClasses.forEach(c=>{if(!existing.includes(String(c.id)))sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`;});
+
+  const fc=document.getElementById('filter-class').value;
+  const filtered=fc==='all'?allResults:allResults.filter(r=>Number(r.classId)===parseInt(fc,10));
+
+  const avg=filtered.length?Math.round(filtered.reduce((s,r)=>s+r.score,0)/filtered.length):0;
+  document.getElementById('r-total').textContent=filtered.length;
+  document.getElementById('r-avg').textContent=avg+'%';
+  document.getElementById('r-pass').textContent=filtered.length?Math.round(filtered.filter(r=>r.score>=60).length/filtered.length*100)+'%':'0%';
+  document.getElementById('r-excel').textContent=filtered.length?Math.round(filtered.filter(r=>r.score>=80).length/filtered.length*100)+'%':'0%';
+
+  // ترتيب الطلاب
+  const sm={};
+  filtered.forEach(r=>{if(!sm[r.studentName])sm[r.studentName]=[];sm[r.studentName].push(r.score);});
+  const ranked=Object.entries(sm).map(([n,s])=>({n,avg:Math.round(s.reduce((a,b)=>a+b)/s.length),count:s.length})).sort((a,b)=>b.avg-a.avg);
+  const colors=['pf-gold','pf-purple','pf-teal','pf-green','pf-red'];
+  document.getElementById('students-ranking').innerHTML=!ranked.length?`<div class="empty-state"><div class="empty-icon">🏆</div><p>لا بيانات</p></div>`:
+    ranked.slice(0,8).map((s,i)=>`
+      <div class="progress-row">
+        <div class="progress-labels">
+          <span style="font-weight:600;color:var(--text)">${i+1}. ${s.n.split(' ').slice(0,2).join(' ')} <small style="color:var(--text3)">(${s.count} اختبار)</small></span>
+          <span class="${getScoreClass(s.avg)}">${s.avg}%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill ${colors[i%5]}" style="width:${s.avg}%"></div></div>
+      </div>`).join('');
+
+  // توزيع الدرجات
+  const dist=[
+    {label:'🌟 90–100%',min:90,max:100,cls:'pf-gold'},
+    {label:'✅ 80–89%', min:80,max:89, cls:'pf-green'},
+    {label:'👍 70–79%', min:70,max:79, cls:'pf-teal'},
+    {label:'⚠️ 60–69%', min:60,max:69, cls:'pf-purple'},
+    {label:'❌ أقل 60%', min:0,max:59,  cls:'pf-red'},
+  ];
+  document.getElementById('score-dist').innerHTML=dist.map(d=>{
+    const cnt=filtered.filter(r=>r.score>=d.min&&r.score<=d.max).length;
+    const pct=filtered.length?Math.round(cnt/filtered.length*100):0;
+    return `<div class="progress-row">
+      <div class="progress-labels"><span>${d.label}</span><span style="font-weight:700">${cnt} (${pct}%)</span></div>
+      <div class="progress-bar"><div class="progress-fill ${d.cls}" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+
+  // أداء الاختبارات
+  const testMap={};
+  filtered.forEach(r=>{if(!testMap[r.testId])testMap[r.testId]=[];testMap[r.testId].push(r.score);});
+  const tp=document.getElementById('tests-performance');
+  if(!Object.keys(testMap).length){tp.innerHTML=`<div class="empty-state"><div class="empty-icon">📝</div><p>لا بيانات</p></div>`;}
+  else tp.innerHTML=`<div class="grid-3">${Object.entries(testMap).map(([tid,scores])=>{
+    const t=allTests.find(x=>x.id===parseInt(tid));
+    const tavg=Math.round(scores.reduce((a,b)=>a+b)/scores.length);
+    return `<div style="background:var(--bg3);border:1px solid var(--card-border);border-radius:14px;padding:16px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">${t?.title||'اختبار'}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:12px;color:var(--text3)">${scores.length} إجابة</span>
+        ${getTypeBadge(t?.type||'test')}
+      </div>
+      <div class="progress-bar"><div class="progress-fill ${tavg>=80?'pf-green':tavg>=60?'pf-teal':'pf-red'}" style="width:${tavg}%"></div></div>
+      <div class="progress-labels" style="margin-top:6px"><span style="color:var(--text3);font-size:12px">المتوسط</span><span class="${getScoreClass(tavg)}">${tavg}%</span></div>
+    </div>`;
+  }).join('')}</div>`;
+
+  renderTable(filtered);
+}
+
+function filterTable(){
+  const search=document.getElementById('search').value.toLowerCase();
+  const type=document.getElementById('ft-type').value;
+  const fc=document.getElementById('filter-class').value;
+  let f=allResults;
+  if(fc!=='all')f=f.filter(r=>Number(r.classId)===parseInt(fc,10));
+  if(type!=='all')f=f.filter(r=>r.type===type);
+  if(search)f=f.filter(r=>r.studentName.toLowerCase().includes(search));
+  renderTable(f);
+}
+
+function renderTable(results){
+  const tb=document.getElementById('full-table');
+  if(!results.length){tb.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text3)">لا توجد نتائج</td></tr>`;return;}
+  tb.innerHTML=results.slice().reverse().map(r=>{
+    const cls=allClasses.find(c=>Number(c.id)===Number(r.classId));
+    const t=allTests.find(x=>x.id===r.testId);
+    return `<tr>
+      <td style="font-weight:600;color:var(--text)">${r.studentName}</td>
+      <td>${cls?.name||'—'}</td>
+      <td>${t?.title||'—'}</td>
+      <td>${getTypeBadge(r.type)}</td>
+      <td><span class="${getScoreClass(r.score)}">${r.score}%</span></td>
+      <td style="color:var(--text3)">${r.time||'—'}</td>
+      <td style="color:var(--text3)">${r.date}</td>
+    </tr>`;
+  }).join('');
+}
+
+load();
+</script>
+</body>
+</html>

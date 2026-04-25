@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصتي — إنشاء اختبار</title>
+  <link rel="stylesheet" href="css/style.css?v=20260406">
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main-content">
+  <div class="topbar">
+    <div class="topbar-title">
+      <h1>📝 إنشاء اختبار أو نشاط</h1>
+      <p>اختبارات، تحديات، وواجبات — أضف الأسئلة ثم انشر للفصل</p>
+    </div>
+    <div class="topbar-actions">
+      <a href="classes.html" class="btn btn-secondary" style="padding:10px 16px;font-size:13px">← فصولي</a>
+    </div>
+  </div>
+
+  <div class="page page-narrow">
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">
+        <div class="card-title">⚙️ إعدادات النشاط</div>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">عنوان الاختبار</label>
+            <input type="text" class="form-input" id="test-title" placeholder="مثال: اختبار الوحدة الأولى">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">نوع النشاط</label>
+            <select class="form-input" id="test-type">
+              <option value="test">📝 اختبار</option>
+              <option value="challenge">⚡ تحدي</option>
+              <option value="homework">📖 واجب منزلي</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">الفصل</label>
+            <select class="form-input" id="test-class">
+              <option value="">اختر الفصل...</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">مدة الاختبار (دقائق) — 0 = بدون حد</label>
+            <input type="number" class="form-input" id="test-duration" placeholder="0" min="0" value="0">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="editor-section-title">❓ الأسئلة</div>
+    <div id="questions-container"></div>
+
+    <button type="button" class="add-q-btn" onclick="addQuestion()">+ إضافة سؤال جديد</button>
+
+    <div style="display:flex;gap:12px;margin-top:22px;flex-wrap:wrap">
+      <button type="button" class="btn btn-primary" style="flex:2;min-width:200px" onclick="saveTest(true)">💾 حفظ ونشر</button>
+      <button type="button" class="btn btn-secondary" style="flex:1;min-width:140px" onclick="saveTest(false)">📄 حفظ كمسودة</button>
+      <button type="button" class="btn btn-secondary" style="flex:1;min-width:120px" onclick="history.back()">إلغاء</button>
+    </div>
+    <div id="save-alert" class="hidden mt-18"></div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const teacher = checkAuth();
+document.getElementById('sidebar-container').innerHTML = getSidebar('tests');
+
+let questionCount = 0;
+
+const classes = JSON.parse(localStorage.getItem('classes') || '[]').filter(c => c.teacherId === (teacher.id || 1));
+const sel = document.getElementById('test-class');
+classes.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
+
+const params = new URLSearchParams(location.search);
+if (params.get('classId')) sel.value = params.get('classId');
+if (params.get('type')) document.getElementById('test-type').value = params.get('type');
+if (params.get('title')) document.getElementById('test-title').value = decodeURIComponent(params.get('title'));
+
+function addQuestion(data = null) {
+  questionCount++;
+  const qn = questionCount;
+  const questionType = data?.questionType || data?.kind || 'mcq';
+  const div = document.createElement('div');
+  div.className = 'question-card';
+  div.id = `q-${qn}`;
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="question-num">السؤال ${qn}</div>
+      <button type="button" onclick="removeQuestion(${qn})" style="color:var(--danger);background:none;border:none;cursor:pointer;font-size:18px" title="حذف">🗑️</button>
+    </div>
+    <input type="text" class="form-input" id="q-text-${qn}" placeholder="نص السؤال..." value="${data?.text || ''}" style="margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:10px">
+      <label class="form-label" style="margin-bottom:0">نوع السؤال</label>
+      <select class="form-input" id="q-type-${qn}" onchange="renderQuestionFields(${qn})">
+        <option value="mcq" ${questionType === 'mcq' ? 'selected' : ''}>اختيار متعدد</option>
+        <option value="essay" ${questionType === 'essay' ? 'selected' : ''}>مقالي</option>
+        <option value="compare" ${questionType === 'compare' ? 'selected' : ''}>مقارنة</option>
+      </select>
+    </div>
+    <div id="q-fields-${qn}"></div>
+  `;
+  document.getElementById('questions-container').appendChild(div);
+  renderQuestionFields(qn, data);
+}
+
+function renderQuestionFields(qn, data = null) {
+  const questionType = document.getElementById(`q-type-${qn}`)?.value || 'mcq';
+  const container = document.getElementById(`q-fields-${qn}`);
+  if (!container) return;
+
+  if (questionType === 'mcq') {
+    container.innerHTML = `
+      <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px">الخيارات (حدد الإجابة الصحيحة):</div>
+      <div id="opts-${qn}">
+        ${[0, 1, 2, 3].map(i => `
+          <div class="option-input-row">
+            <input type="radio" name="correct-${qn}" value="${i}" class="option-radio" ${data?.correct === i ? 'checked' : ''}>
+            <input type="text" class="option-input" id="opt-${qn}-${i}" placeholder="الخيار ${['أ', 'ب', 'ج', 'د'][i]}" value="${data?.options?.[i] || ''}">
+          </div>
+        `).join('')}
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px">
+      ${questionType === 'essay' ? 'إجابة نموذجية (اختياري):' : 'محاور المقارنة أو إجابة نموذجية (اختياري):'}
+    </div>
+    <textarea class="form-input" id="sample-answer-${qn}" rows="4" placeholder="${questionType === 'essay' ? 'اكتب عناصر الإجابة النموذجية...' : 'مثال: قارن بين المفهوم A و B من حيث التعريف، الخصائص، وأمثلة الاستخدام...'}">${data?.sampleAnswer || data?.expectedAnswer || ''}</textarea>
+  `;
+}
+
+function removeQuestion(qn) {
+  document.getElementById(`q-${qn}`)?.remove();
+}
+
+function saveTest(active = true) {
+  const title = document.getElementById('test-title').value.trim();
+  const type = document.getElementById('test-type').value;
+  const classId = parseInt(document.getElementById('test-class').value, 10);
+  const duration = parseInt(document.getElementById('test-duration').value, 10) || 0;
+
+  if (!title) { showSaveAlert('يرجى إدخال عنوان الاختبار', 'error'); return; }
+  if (!classId) { showSaveAlert('يرجى اختيار الفصل', 'error'); return; }
+
+  const questions = [];
+  for (let i = 1; i <= questionCount; i++) {
+    const el = document.getElementById(`q-${i}`);
+    if (!el) continue;
+    const text = document.getElementById(`q-text-${i}`)?.value.trim();
+    if (!text) continue;
+    const kind = document.getElementById(`q-type-${i}`)?.value || 'mcq';
+
+    if (kind === 'mcq') {
+      const options = [0, 1, 2, 3].map(j => document.getElementById(`opt-${i}-${j}`)?.value.trim() || '');
+      const filteredOptions = options.filter(o => o);
+      const correctEl = document.querySelector(`input[name="correct-${i}"]:checked`);
+      const correct = correctEl ? parseInt(correctEl.value, 10) : -1;
+      if (filteredOptions.length < 2) { showSaveAlert(`أضف خيارين على الأقل في السؤال ${i}`, 'error'); return; }
+      if (correct < 0 || !options[correct]) { showSaveAlert(`حدد الإجابة الصحيحة في السؤال ${i}`, 'error'); return; }
+      questions.push({ text, kind, options: filteredOptions, correct });
+      continue;
+    }
+
+    const sampleAnswer = document.getElementById(`sample-answer-${i}`)?.value.trim() || '';
+    questions.push({ text, kind, sampleAnswer });
+  }
+
+  if (questions.length === 0) { showSaveAlert('أضف سؤالاً واحداً على الأقل', 'error'); return; }
+
+  const tests = JSON.parse(localStorage.getItem('tests') || '[]');
+  const newTest = {
+    id: Date.now(),
+    title,
+    type,
+    classId,
+    duration,
+    questions,
+    active,
+    teacherId: teacher.id || 1,
+    createdAt: new Date().toISOString()
+  };
+  tests.push(newTest);
+  localStorage.setItem('tests', JSON.stringify(tests));
+
+  showSaveAlert(active ? 'تم نشر النشاط بنجاح' : 'تم حفظ المسودة', 'success');
+  setTimeout(() => { window.location.href = `class-detail.html?id=${classId}`; }, 900);
+}
+
+function showSaveAlert(msg, type) {
+  const a = document.getElementById('save-alert');
+  a.className = `alert alert-${type}`;
+  a.textContent = (type === 'success' ? '✅ ' : '❌ ') + msg;
+  a.classList.remove('hidden');
+  setTimeout(() => a.classList.add('hidden'), 3500);
+}
+
+addQuestion();
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصتي — الإعدادات</title>
+  <link rel="stylesheet" href="css/style.css?v=20260406">
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main-content">
+  <div class="topbar">
+    <div class="topbar-title">
+      <h1>⚙️ الإعدادات</h1>
+      <p>الملف الشخصي وأمان الحساب</p>
+    </div>
+  </div>
+
+  <div class="page" style="max-width:640px">
+    <p style="font-size:12px;color:var(--text3);margin:-8px 0 20px">
+      <a href="dashboard.html" style="color:var(--c1);font-weight:600">الرئيسية</a>
+      <span style="margin:0 6px;opacity:0.5">←</span>
+      <span>الإعدادات</span>
+    </p>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">
+        <div class="card-title">👤 الملف الشخصي</div>
+      </div>
+      <div class="card-body">
+        <div id="settings-alert" class="hidden"></div>
+        <div class="form-group">
+          <label class="form-label">الاسم الكامل</label>
+          <input type="text" class="form-input" id="s-name" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">البريد الإلكتروني أو اسم المستخدم</label>
+          <input type="text" class="form-input" id="s-email" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">المادة</label>
+          <input type="text" class="form-input" id="s-subject">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">المرحلة الدراسية</label>
+          <input type="text" class="form-input" id="s-grade">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div class="card-title">🔐 كلمة المرور</div>
+      </div>
+      <div class="card-body">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">كلمة المرور الجديدة</label>
+          <input type="password" class="form-input" id="s-pass" placeholder="اتركه فارغاً إذا لم تريد التغيير" autocomplete="new-password">
+        </div>
+      </div>
+    </div>
+
+    <button type="button" class="btn btn-primary" style="width:100%" onclick="saveSettings()">💾 حفظ الإعدادات</button>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const teacher = checkAuth();
+document.getElementById('sidebar-container').innerHTML = getSidebar('settings');
+
+document.getElementById('s-name').value    = teacher.name || '';
+document.getElementById('s-email').value    = teacher.email || teacher.username || '';
+document.getElementById('s-subject').value = teacher.subject || '';
+document.getElementById('s-grade').value   = teacher.grade || '';
+
+function saveSettings() {
+  const name = document.getElementById('s-name').value.trim();
+  const email = document.getElementById('s-email').value.trim();
+  const subject = document.getElementById('s-subject').value.trim();
+  const grade = document.getElementById('s-grade').value.trim();
+  const pass = document.getElementById('s-pass').value.trim();
+
+  const updated = { ...teacher, name, email, subject, grade };
+  if (email && !updated.username) updated.username = email;
+  if (pass) updated.password = pass;
+
+  localStorage.setItem('currentTeacher', JSON.stringify(updated));
+
+  let teachers = JSON.parse(localStorage.getItem('teachers') || '[]');
+  const idx = teachers.findIndex(t =>
+    (teacher.id != null && t.id === teacher.id) ||
+    (teacher.email && (t.email === teacher.email || t.username === teacher.email)) ||
+    (teacher.username && (t.username === teacher.username || t.email === teacher.username))
+  );
+  if (idx >= 0) {
+    teachers[idx] = { ...teachers[idx], ...updated };
+    localStorage.setItem('teachers', JSON.stringify(teachers));
+  }
+
+  const a = document.getElementById('settings-alert');
+  a.className = 'alert alert-success';
+  a.textContent = 'تم حفظ الإعدادات بنجاح';
+  a.classList.remove('hidden');
+  setTimeout(() => a.classList.add('hidden'), 2800);
+}
+</script>
+</body>
+</html>
