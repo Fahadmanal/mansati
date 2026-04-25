@@ -158,7 +158,7 @@
           cloudDB.listResultsByClass(classId),
           cloudDB.listStudentsByClass(classId)
         ]);
-        if (Array.isArray(remoteResults)) {
+        if (Array.isArray(remoteResults) && remoteResults.length > 0) {
           allResults = remoteResults.map(r => ({
             studentName: r.student_name,
             classId: Number(r.class_id),
@@ -175,7 +175,7 @@
           }));
           localStorage.setItem('results', JSON.stringify(allResults));
         }
-        if (Array.isArray(remoteStudents)) {
+        if (Array.isArray(remoteStudents) && remoteStudents.length > 0) {
           allStudents = remoteStudents.map(s => ({
             name: s.name,
             classId: Number(s.class_id),

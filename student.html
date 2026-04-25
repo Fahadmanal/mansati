@@ -163,7 +163,13 @@
     currentStudent = { name, classId: cls.id, className: cls.name, code };
     currentStudent = registerStudentIfNeeded(currentStudent);
     if (window.cloudDB?.isEnabled()) {
-      try { await cloudDB.upsertStudent({ name, classId: cls.id }); } catch (e) { console.warn('Cloud student save failed:', e.message); }
+      try {
+        // Ensure class exists remotely before inserting student (FK safety).
+        await cloudDB.upsertClass(cls);
+        await cloudDB.upsertStudent({ name, classId: cls.id });
+      } catch (e) {
+        console.warn('Cloud student save failed:', e.message);
+      }
     }
     loadClassScreen();
   }
@@ -189,7 +195,7 @@
           cloudDB.listTestsByClass(cid, true),
           cloudDB.listResultsByClass(cid)
         ]);
-        if (Array.isArray(remoteTests)) {
+        if (Array.isArray(remoteTests) && remoteTests.length > 0) {
           tests = remoteTests.map(t => ({
             id: Number(t.id),
             classId: Number(t.class_id),
@@ -203,7 +209,7 @@
           }));
           localStorage.setItem('tests', JSON.stringify(tests));
         }
-        if (Array.isArray(remoteResults)) {
+        if (Array.isArray(remoteResults) && remoteResults.length > 0) {
           const mapped = remoteResults.map(r => ({
             studentName: r.student_name,
             classId: Number(r.class_id),
