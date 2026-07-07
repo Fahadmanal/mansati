@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>لوحة المدير — ملفات الأداء الوظيفي</title>
+<link rel="stylesheet" href="css/style.css?v=20260406">
+<style>
+  .page{padding:26px}
+  .adm-topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:24px}
+  .adm-logo{display:flex;align-items:center;gap:12px}
+  .adm-logo .logo-mark{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--c4),#D97706);display:flex;align-items:center;justify-content:center;font-size:22px}
+  .t-row{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--card-border);border-radius:14px;margin-bottom:12px;cursor:pointer;transition:.2s;background:var(--bg3)}
+  .t-row:hover{border-color:rgba(108,60,247,0.3);box-shadow:0 6px 20px rgba(108,60,247,0.07)}
+  .t-avatar{width:44px;height:44px;flex:none;border-radius:12px;background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .t-name{font-weight:700;color:var(--text)}
+  .t-sub{font-size:12px;color:var(--text3);margin-top:2px}
+  .t-bar{flex:1;min-width:120px}
+  .t-counts{display:flex;gap:8px;flex-wrap:wrap}
+  .cnt-chip{font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:var(--bg2,#fff);border:1px solid var(--card-border);color:var(--text2)}
+  .modal.wide{max-width:680px;width:94%}
+  .ev-item{background:var(--bg3);border:1px solid var(--card-border);border-radius:14px;padding:14px;margin-bottom:12px}
+  .ev-title{font-weight:700;color:var(--text);font-size:14px}
+  .ev-meta{font-size:12px;color:var(--text3);margin-top:4px;display:flex;flex-wrap:wrap;gap:10px}
+  .ev-impact{font-size:12.5px;color:var(--text2);margin-top:8px;background:rgba(16,185,129,0.06);border-right:3px solid var(--c5);padding:6px 10px;border-radius:8px}
+  .rev-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+  .lack-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .lack-title{flex:1;font-size:13px;color:var(--text)}
+</style>
+</head>
+<body>
+<div class="main-content" style="margin:0">
+  <div class="page">
+    <div class="adm-topbar">
+      <div class="adm-logo">
+        <div class="logo-mark">🏫</div>
+        <div>
+          <h1 style="font-size:19px;font-weight:800" id="adm-title">لوحة مدير المدرسة</h1>
+          <p style="font-size:12.5px;color:var(--text3)" id="adm-sub">ملفات الأداء الوظيفي للمعلمين</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" onclick="window.print()">🖨️ تقرير المدرسة</button>
+        <button class="btn btn-secondary" onclick="logoutManager()">🚪 خروج</button>
+      </div>
+    </div>
+
+    <!-- إحصائيات المدرسة -->
+    <div class="stats-row anim-fadeup">
+      <div class="stat-card s1"><div class="stat-icon">👨‍🏫</div><div class="stat-val" id="k-teachers">0</div><div class="stat-lbl">معلمو المدرسة</div></div>
+      <div class="stat-card s2"><div class="stat-icon">📊</div><div class="stat-val" id="k-avg">0%</div><div class="stat-lbl">متوسط جاهزية الملفات</div></div>
+      <div class="stat-card s3"><div class="stat-icon">✅</div><div class="stat-val" id="k-approved">0</div><div class="stat-lbl">شواهد معتمدة</div></div>
+      <div class="stat-card s4"><div class="stat-icon">⏳</div><div class="stat-val" id="k-pending">0</div><div class="stat-lbl">بانتظار المراجعة</div></div>
+    </div>
+
+    <div class="grid-2 mt-24">
+      <!-- قائمة المعلمين -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">👥 معلمو المدرسة</div></div>
+        <div class="card-body" id="teachers-list"></div>
+      </div>
+      <!-- أكثر المعايير نقصاً -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">⚠️ أكثر المعايير نقصاً في المدرسة</div></div>
+        <div class="card-body" id="lacking-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: مراجعة شواهد معلم -->
+<div class="modal-overlay" id="modal-review">
+  <div class="modal wide">
+    <div class="modal-header">
+      <div class="modal-title" id="rv-title">مراجعة الشواهد</div>
+      <div class="modal-close" onclick="closeModal('modal-review')">✕</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <select class="form-input" id="rv-crit" onchange="renderReview()" style="width:auto;flex:1;min-width:180px"></select>
+      <select class="form-input" id="rv-status" onchange="renderReview()" style="width:auto">
+        <option value="all">كل الحالات</option>
+        <option value="submitted">مرسل للمراجعة</option>
+        <option value="approved">معتمد</option>
+        <option value="needs_edit">يحتاج تعديل</option>
+        <option value="rejected">مرفوض</option>
+        <option value="draft">مسودة</option>
+      </select>
+    </div>
+    <div id="rv-list"></div>
+  </div>
+</div>
+
+<script src="js/supabase-config.js"></script>
+<script src="js/cloud-db.js"></script>
+<script src="js/portfolio-criteria.js"></script>
+<script src="js/app.js"></script>
+<script>
+const manager = JSON.parse(localStorage.getItem('currentManager') || 'null');
+if (!manager) window.location.href = 'index.html';
+
+let schoolTeachers = [];   // [{...teacher, evidences:[]}]
+let currentTeacher = null; // المعلم قيد المراجعة
+
+document.getElementById('adm-title').textContent = `لوحة ${manager.name || 'المدير'}`;
+document.getElementById('adm-sub').textContent = `🏫 ${manager.school || 'مدرسة غير محددة'} — ملفات الأداء الوظيفي`;
+document.getElementById('rv-crit').innerHTML =
+  '<option value="all">كل المعايير</option>' +
+  PERFORMANCE_CRITERIA.map(c => `<option value="${c.id}">${c.order}. ${c.title}</option>`).join('');
+
+function logoutManager(){ localStorage.removeItem('currentManager'); window.location.href = 'index.html'; }
+
+function loadTeachers() {
+  const all = JSON.parse(localStorage.getItem('teachers') || '[]');
+  const mine = manager.school
+    ? all.filter(t => (t.school || '') === manager.school)
+    : all;
+  schoolTeachers = mine.map(t => ({ ...t, evidences: getTeacherEvidences(t.id) }));
+}
+
+async function syncFromCloud() {
+  if (!window.cloudDB || !cloudDB.isEnabled()) return;
+  try {
+    const rows = await cloudDB.listAllEvidences();
+    if (!Array.isArray(rows)) return;
+    const mapped = rows.map(r => ({
+      id: r.id, teacherId: r.teacher_id, schoolId: r.school_id, criterionId: r.criterion_id,
+      title: r.title, description: r.description, evidenceDate: r.evidence_date,
+      evidenceType: r.evidence_type, fileUrl: r.file_url, storagePath: r.storage_path,
+      impactNote: r.impact_note, status: r.status, managerNote: r.manager_note,
+      reviewedBy: r.reviewed_by, reviewedAt: r.reviewed_at,
+      createdAt: r.created_at, updatedAt: r.updated_at
+    }));
+    saveAllEvidences(mapped);
+    loadTeachers(); render();
+  } catch (e) { console.warn('sync failed', e); }
+}
+
+function coverageClass(pct){ return pct>=80?'pf-green':pct>=50?'pf-teal':pct>=25?'pf-gold':'pf-red'; }
+
+function render() {
+  // مؤشرات عامة
+  let totApproved = 0, totPending = 0, sumPct = 0;
+  schoolTeachers.forEach(t => {
+    const tot = statusTotals(t.evidences);
+    totApproved += tot.approved;
+    totPending += tot.submitted;
+    sumPct += portfolioCompletion(t.evidences);
+  });
+  const avg = schoolTeachers.length ? Math.round(sumPct / schoolTeachers.length) : 0;
+  document.getElementById('k-teachers').textContent = schoolTeachers.length;
+  document.getElementById('k-avg').textContent = avg + '%';
+  document.getElementById('k-approved').textContent = totApproved;
+  document.getElementById('k-pending').textContent = totPending;
+
+  // قائمة المعلمين
+  const box = document.getElementById('teachers-list');
+  if (!schoolTeachers.length) {
+    box.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><p>لا يوجد معلمون في مدرستك بعد</p><small>يسجّل المعلمون بنفس اسم المدرسة لتظهر ملفاتهم هنا</small></div>`;
+  } else {
+    box.innerHTML = schoolTeachers.map((t, i) => {
+      const pct = portfolioCompletion(t.evidences);
+      const tot = statusTotals(t.evidences);
+      const initials = (t.name||'م').split(' ').slice(0,2).map(w=>w[0]).join('');
+      return `<div class="t-row" onclick="openReview(${i})">
+        <div class="t-avatar">${initials}</div>
+        <div style="min-width:130px">
+          <div class="t-name">${t.name||'معلم'}</div>
+          <div class="t-sub">${t.subject||'—'}</div>
+        </div>
+        <div class="t-bar">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text3)">الجاهزية</span><strong>${pct}%</strong></div>
+          <div class="progress-bar"><div class="progress-fill ${coverageClass(pct)}" style="width:${pct}%"></div></div>
+        </div>
+        <div class="t-counts">
+          <span class="cnt-chip" style="color:#047857">✅ ${tot.approved}</span>
+          <span class="cnt-chip" style="color:#0E7490">📤 ${tot.submitted}</span>
+          <span class="cnt-chip" style="color:#B45309">✏️ ${tot.needs_edit}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // أكثر المعايير نقصاً
+  const lacking = mostLackingCriteria(schoolTeachers).slice(0, 6);
+  document.getElementById('lacking-list').innerHTML = !schoolTeachers.length
+    ? `<div class="empty-state"><div class="empty-icon">📉</div><p>لا بيانات بعد</p></div>`
+    : lacking.map(l => `<div class="lack-row">
+        <span class="lack-title">${l.criterion.order}. ${l.criterion.title}</span>
+        <div style="width:110px"><div class="progress-bar"><div class="progress-fill ${coverageClass(l.coveragePct)}" style="width:${l.coveragePct}%"></div></div></div>
+        <span style="font-size:12px;font-weight:700;min-width:80px;text-align:left">${l.coveredBy}/${l.totalTeachers} معلم</span>
+      </div>`).join('');
+}
+
+function openReview(idx) {
+  currentTeacher = schoolTeachers[idx];
+  document.getElementById('rv-title').textContent = `مراجعة شواهد: ${currentTeacher.name}`;
+  document.getElementById('rv-crit').value = 'all';
+  document.getElementById('rv-status').value = 'all';
+  renderReview();
+  openModal('modal-review');
+}
+
+function renderReview() {
+  const critF = document.getElementById('rv-crit').value;
+  const statusF = document.getElementById('rv-status').value;
+  let list = currentTeacher.evidences.slice();
+  if (critF !== 'all') list = list.filter(e => Number(e.criterionId) === Number(critF));
+  if (statusF !== 'all') list = list.filter(e => e.status === statusF);
+  list.sort((a,b)=> (a.status==='submitted'?-1:1) - (b.status==='submitted'?-1:1));
+
+  const box = document.getElementById('rv-list');
+  if (!list.length) { box.innerHTML = `<div class="empty-state"><div class="empty-icon">🗂️</div><p>لا شواهد ضمن هذه التصفية</p></div>`; return; }
+  box.innerHTML = list.map(e => {
+    const tm = evidenceTypeMeta(e.evidenceType), sm = evidenceStatusMeta(e.status), c = criterionById(e.criterionId);
+    return `<div class="ev-item">
+      <div style="display:flex;justify-content:space-between;gap:10px">
+        <div>
+          <div class="ev-title">${tm.icon} ${e.title}</div>
+          <div class="ev-meta">
+            <span>📌 ${c?c.order+'. '+c.title:'—'}</span>
+            ${e.evidenceDate?`<span>📅 ${e.evidenceDate}</span>`:''}
+            ${e.fileUrl?`<a href="${e.fileUrl}" target="_blank" style="color:var(--c2)">🔗 عرض المرفق</a>`:''}
+          </div>
+        </div>
+        <span class="badge ${sm.badge}">${sm.icon} ${sm.label}</span>
+      </div>
+      ${e.description?`<div style="font-size:13px;color:var(--text2);margin-top:8px">${e.description}</div>`:''}
+      ${e.impactNote?`<div class="ev-impact">📈 الأثر: ${e.impactNote}</div>`:''}
+      <div class="form-group" style="margin:10px 0 0">
+        <textarea class="form-input" id="note-${e.id}" rows="2" placeholder="ملاحظة المدير (إلزامية عند طلب التعديل أو الرفض)">${e.managerNote||''}</textarea>
+      </div>
+      <div class="rev-actions">
+        <button class="btn-sm btn-sm-primary" style="background:linear-gradient(135deg,var(--c5),#059669)" onclick="reviewEvidence(${e.id},'approved')">✅ اعتماد</button>
+        <button class="btn-sm" style="background:rgba(245,158,11,0.15);color:#B45309;border:1px solid rgba(245,158,11,0.3)" onclick="reviewEvidence(${e.id},'needs_edit')">✏️ طلب تعديل</button>
+        <button class="btn-sm btn-sm-danger" onclick="reviewEvidence(${e.id},'rejected')">❌ رفض</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function reviewEvidence(id, newStatus) {
+  const note = (document.getElementById('note-'+id).value || '').trim();
+  if ((newStatus === 'needs_edit' || newStatus === 'rejected') && !note) {
+    alert('يجب كتابة ملاحظة توضّح سبب ' + (newStatus==='rejected'?'الرفض':'طلب التعديل'));
+    return;
+  }
+  const all = getAllEvidences();
+  const ev = all.find(e => e.id === id);
+  if (!ev) return;
+  ev.status = newStatus;
+  ev.managerNote = note;
+  ev.reviewedBy = manager.id || 1;
+  ev.reviewedAt = new Date().toISOString();
+  ev.updatedAt = ev.reviewedAt;
+  saveAllEvidences(all);
+  if (window.cloudDB && cloudDB.isEnabled()) cloudDB.upsertEvidence(ev).catch(()=>{});
+
+  // تحديث النسخة المحلية للمعلم الحالي
+  currentTeacher.evidences = getTeacherEvidences(currentTeacher.id);
+  loadTeachers();
+  renderReview();
+  render();
+}
+
+loadTeachers();
+render();
+syncFromCloud();
+</script>
+</body>
+</html>

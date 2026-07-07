@@ -30,6 +30,7 @@
 
     <div class="tabs">
       <button class="tab-btn active" id="tb-teacher" onclick="switchTab('teacher')">👨‍🏫 معلم</button>
+      <button class="tab-btn" id="tb-manager" onclick="switchTab('manager')">🏫 مدير</button>
       <button class="tab-btn" id="tb-student" onclick="switchTab('student')">🎓 طالب</button>
     </div>
 
@@ -55,6 +56,24 @@
       <button class="btn-login" onclick="loginTeacher()">تسجيل الدخول ✨</button>
       <div class="login-footer">ليس لديك حساب؟ <a href="register.html">أنشئ حسابك الآن</a></div>
       <div class="login-hint">💡 للتجربة: <strong>demo</strong> / <strong>123456</strong></div>
+    </div>
+
+    <!-- نموذج المدير -->
+    <div id="form-manager" class="hidden">
+      <div style="text-align:center;margin-bottom:22px">
+        <div style="font-size:52px;margin-bottom:8px;animation:float 3s ease-in-out infinite">🏫</div>
+        <p style="color:var(--text3);font-size:14px">دخول مدير المدرسة لمراجعة ملفات أداء المعلمين</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">البريد أو اسم المستخدم</label>
+        <input type="text" class="form-input" id="manager-user" placeholder="أدخل بريدك...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">كلمة المرور</label>
+        <input type="password" class="form-input" id="manager-pass" placeholder="••••••••">
+      </div>
+      <button class="btn-login" onclick="loginManager()" style="background:linear-gradient(135deg,var(--c4),#D97706);box-shadow:0 6px 25px rgba(245,158,11,0.4)">دخول المدير 🏫</button>
+      <div class="login-hint">💡 للتجربة: <strong>manager</strong> / <strong>123456</strong></div>
     </div>
 
     <!-- نموذج الطالب -->
@@ -99,11 +118,10 @@
 
 <script>
 function switchTab(t){
-  const isTch=t==='teacher';
-  document.getElementById('form-teacher').classList.toggle('hidden',!isTch);
-  document.getElementById('form-student').classList.toggle('hidden',isTch);
-  document.getElementById('tb-teacher').classList.toggle('active',isTch);
-  document.getElementById('tb-student').classList.toggle('active',!isTch);
+  ['teacher','manager','student'].forEach(k=>{
+    document.getElementById('form-'+k).classList.toggle('hidden', k!==t);
+    document.getElementById('tb-'+k).classList.toggle('active', k===t);
+  });
 }
 function switchStudentAuth(mode){
   const isLogin = mode === 'login';
@@ -129,6 +147,22 @@ function loginTeacher(){
     localStorage.setItem('currentTeacher',JSON.stringify(teacher));
     showAlert('مرحباً بك! 🎉','success');
     setTimeout(()=>window.location.href='dashboard.html',700);
+  } else showAlert('بيانات الدخول غير صحيحة','error');
+}
+function loginManager(){
+  const u=document.getElementById('manager-user').value.trim();
+  const p=document.getElementById('manager-pass').value.trim();
+  if(!u||!p){showAlert('يرجى تعبئة جميع الحقول','error');return}
+  const managers=JSON.parse(localStorage.getItem('managers')||'[]');
+  let found=managers.find(m=>(m.email===u||m.username===u)&&m.password===p);
+  if(!found&&u==='manager'&&p==='123456'){
+    found={id:1,name:'مدير المدرسة',email:'manager',username:'manager',school:'متوسطة الأمير سلطان'};
+  }
+  if(found){
+    localStorage.setItem('currentManager',JSON.stringify(found));
+    localStorage.removeItem('currentTeacher');
+    showAlert('مرحباً بك 🏫','success');
+    setTimeout(()=>window.location.href='admin-portfolio.html',700);
   } else showAlert('بيانات الدخول غير صحيحة','error');
 }
 function loginStudent(){
@@ -167,9 +201,12 @@ function registerStudent(){
 // بيانات تجريبية
 if(!localStorage.getItem('initialized')){
   const teachersSeed=[
-    {id:1,name:'فهد عليان العنزي',email:'demo',username:'demo',password:'123456',subject:'لغتي',grade:'الثالث المتوسط',points:0}
+    {id:1,name:'فهد عليان العنزي',email:'demo',username:'demo',password:'123456',subject:'لغتي',grade:'الثالث المتوسط',school:'متوسطة الأمير سلطان',points:0}
   ];
   localStorage.setItem('teachers',JSON.stringify(teachersSeed));
+  localStorage.setItem('managers',JSON.stringify([
+    {id:1,name:'خالد المدير',email:'manager',username:'manager',password:'123456',school:'متوسطة الأمير سلطان'}
+  ]));
   const classes=[
     {id:1,name:'الثالث المتوسط أ',code:'STAR01',subject:'لغتي',studentCount:3,teacherId:1},
     {id:2,name:'الثالث المتوسط ب',code:'STAR02',subject:'لغتي',studentCount:2,teacherId:1}
@@ -226,7 +263,7 @@ if(!localStorage.getItem('initialized')){
 // ترقية: قائمة معلمين لمن لديهم بيانات قديمة بدون teachers
 if(!localStorage.getItem('teachers')){
   localStorage.setItem('teachers',JSON.stringify([
-    {id:1,name:'فهد عليان العنزي',email:'demo',username:'demo',password:'123456',subject:'لغتي',grade:'الثالث المتوسط',points:0}
+    {id:1,name:'فهد عليان العنزي',email:'demo',username:'demo',password:'123456',subject:'لغتي',grade:'الثالث المتوسط',school:'متوسطة الأمير سلطان',points:0}
   ]));
 }
 </script>

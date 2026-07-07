@@ -8,6 +8,7 @@ function getSidebar(active) {
     {icon:'📚', label:'فصولي',        href:'classes.html',    key:'classes'},
     {icon:'⚡', label:'التحديات',     href:'challenges.html', key:'challenges'},
     {icon:'📝', label:'الاختبارات',  href:'tests.html',      key:'tests'},
+    {icon:'🗂️', label:'ملف الأداء',  href:'portfolio.html',  key:'portfolio'},
     {icon:'📊', label:'التقارير',    href:'reports.html',    key:'reports'},
     {icon:'📖', label:'المكتبة',      href:'library.html',    key:'library'},
     {icon:'🎁', label:'الهدايا',      href:'gifts.html',      key:'gifts'},

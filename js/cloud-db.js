@@ -117,6 +117,108 @@
     return request(`results?class_id=eq.${Number(classId)}&order=id.desc`);
   }
 
+  async function upsertEvidence(ev) {
+    return request('evidences?on_conflict=id', {
+      method: 'POST',
+      body: JSON.stringify([{
+        id: Number(ev.id),
+        teacher_id: Number(ev.teacherId || 1),
+        school_id: ev.schoolId ? Number(ev.schoolId) : null,
+        criterion_id: Number(ev.criterionId),
+        title: ev.title,
+        description: ev.description || '',
+        evidence_date: ev.evidenceDate || null,
+        evidence_type: ev.evidenceType || 'file',
+        file_url: ev.fileUrl || '',
+        storage_path: ev.storagePath || '',
+        impact_note: ev.impactNote || '',
+        status: ev.status || 'draft',
+        manager_note: ev.managerNote || '',
+        reviewed_by: ev.reviewedBy ? Number(ev.reviewedBy) : null,
+        reviewed_at: ev.reviewedAt || null,
+        created_at: ev.createdAt || new Date().toISOString(),
+        updated_at: ev.updatedAt || new Date().toISOString()
+      }]),
+      prefer: 'resolution=merge-duplicates,return=representation'
+    });
+  }
+
+  // ===== تخزين مرفقات الشواهد في Supabase Storage =====
+  const EVIDENCE_BUCKET = 'evidence-attachments';
+
+  // ضغط الصور قبل الرفع (JPG/PNG/WEBP) عبر canvas. غير الصور تُعاد كما هي.
+  async function compressImage(file, maxDim = 1600, quality = 0.8) {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
+    try {
+      const bitmap = await createImageBitmap(file);
+      let { width, height } = bitmap;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/webp', quality));
+      return blob && blob.size < file.size ? blob : file;
+    } catch { return file; }
+  }
+
+  // يرفع الملف إلى المسار school_id/teacher_id/evidence_id/file-name ويعيد { path, publicUrl }.
+  async function uploadEvidenceFile(file, { schoolId, teacherId, evidenceId }) {
+    if (!isEnabled()) throw new Error('التخزين السحابي غير مُفعّل');
+    const payload = await compressImage(file);
+    const safeName = (file.name || 'file')
+      .replace(/[^\w.\-]+/g, '_')
+      .replace(/^image\/\w+$/, 'image')
+      .replace(/\.[^.]+$/, m => (payload !== file && /image/.test(file.type)) ? '.webp' : m);
+    const path = `${Number(schoolId) || 0}/${Number(teacherId) || 0}/${Number(evidenceId)}/${Date.now()}_${safeName}`;
+    const res = await fetch(`${url}/storage/v1/object/${EVIDENCE_BUCKET}/${encodeURI(path)}`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+        'Content-Type': payload.type || file.type || 'application/octet-stream',
+        'x-upsert': 'true'
+      },
+      body: payload
+    });
+    if (!res.ok) throw new Error(`Storage error (${res.status}): ${await res.text()}`);
+    return {
+      path,
+      publicUrl: `${url}/storage/v1/object/public/${EVIDENCE_BUCKET}/${encodeURI(path)}`
+    };
+  }
+
+  async function deleteEvidence(id) {
+    return request(`evidences?id=eq.${Number(id)}`, { method: 'DELETE', prefer: 'return=minimal' });
+  }
+
+  async function listEvidencesByTeacher(teacherId) {
+    return request(`evidences?teacher_id=eq.${Number(teacherId)}&order=criterion_id.asc`);
+  }
+
+  async function listAllEvidences() {
+    return request('evidences?order=teacher_id.asc');
+  }
+
+  async function upsertManager(mgr) {
+    return request('managers?on_conflict=id', {
+      method: 'POST',
+      body: JSON.stringify([{
+        id: Number(mgr.id),
+        name: mgr.name,
+        email: mgr.email || '',
+        username: mgr.username || '',
+        password: mgr.password,
+        school_name: mgr.school || '',
+        created_at: mgr.createdAt || new Date().toISOString()
+      }]),
+      prefer: 'resolution=merge-duplicates,return=representation'
+    });
+  }
+
   global.cloudDB = {
     isEnabled,
     upsertClass,
@@ -127,6 +229,13 @@
     upsertStudent,
     listStudentsByClass,
     insertResult,
-    listResultsByClass
+    listResultsByClass,
+    upsertEvidence,
+    deleteEvidence,
+    listEvidencesByTeacher,
+    listAllEvidences,
+    upsertManager,
+    uploadEvidenceFile,
+    compressImage
   };
 })(window);

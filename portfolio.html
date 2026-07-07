@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>منصتي — ملف الأداء الوظيفي</title>
+<link rel="stylesheet" href="css/style.css?v=20260406">
+<style>
+  .crit-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  @media(max-width:768px){.crit-grid{grid-template-columns:1fr}}
+  .crit-card{background:var(--bg2,#fff);border:1px solid var(--card-border);border-radius:16px;padding:18px;cursor:pointer;transition:.2s;position:relative}
+  .crit-card:hover{border-color:rgba(108,60,247,0.3);box-shadow:0 10px 30px rgba(108,60,247,0.08);transform:translateY(-2px)}
+  .crit-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+  .crit-num{width:34px;height:34px;flex:none;border-radius:10px;background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px}
+  .crit-title{font-size:14.5px;font-weight:700;color:var(--text);line-height:1.5}
+  .crit-weight{font-size:11px;font-weight:700;color:var(--c2);background:rgba(108,60,247,0.1);padding:3px 9px;border-radius:20px;white-space:nowrap}
+  .crit-cov{display:flex;justify-content:space-between;font-size:12px;margin:10px 0 6px}
+  .crit-counts{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .cnt-chip{font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:var(--bg3);color:var(--text2)}
+  .ev-item{background:var(--bg3);border:1px solid var(--card-border);border-radius:14px;padding:14px;margin-bottom:12px}
+  .ev-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .ev-title{font-weight:700;color:var(--text);font-size:14px}
+  .ev-meta{font-size:12px;color:var(--text3);margin-top:4px;display:flex;flex-wrap:wrap;gap:10px}
+  .ev-impact{font-size:12.5px;color:var(--text2);margin-top:8px;background:rgba(16,185,129,0.06);border-right:3px solid var(--c5);padding:6px 10px;border-radius:8px}
+  .ev-note{font-size:12.5px;color:var(--text2);margin-top:8px;background:rgba(245,158,11,0.08);border-right:3px solid var(--c4);padding:6px 10px;border-radius:8px}
+  .ev-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .tpl-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .tpl-chip{font-size:11.5px;padding:4px 10px;border-radius:20px;background:rgba(108,60,247,0.08);border:1px solid rgba(108,60,247,0.2);color:var(--c2);cursor:pointer}
+  .tpl-chip:hover{background:rgba(108,60,247,0.16)}
+  .modal.wide{max-width:640px;width:92%}
+  .summary-num{font-size:46px;font-weight:900;color:var(--text);line-height:1}
+  .parts-line{font-size:11.5px;color:var(--text3);margin-top:4px}
+</style>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main-content">
+  <div class="topbar">
+    <div class="topbar-title">
+      <h1>🗂️ ملف الأداء الوظيفي</h1>
+      <p>نظّم شواهدك حسب عناصر تقييم المعلم الـ 11 وارفعها لاعتماد المدير</p>
+    </div>
+    <div class="topbar-actions">
+      <a href="portfolio-report.html" class="btn btn-primary" style="padding:10px 18px;font-size:13px">📄 معاينة التقرير</a>
+    </div>
+  </div>
+
+  <div class="page">
+    <!-- ملخص الجاهزية -->
+    <div class="card anim-fadeup" style="margin-bottom:22px">
+      <div class="card-body" style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:13px;color:var(--text3);margin-bottom:6px">مؤشر جاهزية ملف الأداء (مساعد للمدير — ليس درجة نهائية)</div>
+          <div style="display:flex;align-items:flex-end;gap:6px">
+            <span class="summary-num" id="sum-pct">0%</span>
+          </div>
+          <div class="parts-line">يُحتسب من الشواهد <strong>المعتمدة</strong> فقط • 70% العدد + 20% التنوّع + 10% اكتمال البيانات</div>
+        </div>
+        <div style="flex:1;min-width:260px;max-width:420px">
+          <div class="progress-bar" style="height:14px"><div class="progress-fill pf-purple" id="sum-bar" style="width:0%"></div></div>
+          <div id="sum-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="crit-grid" id="crit-grid"></div>
+  </div>
+</div>
+
+<!-- Modal: شواهد معيار -->
+<div class="modal-overlay" id="modal-crit">
+  <div class="modal wide">
+    <div class="modal-header">
+      <div class="modal-title" id="mc-title">المعيار</div>
+      <div class="modal-close" onclick="closeModal('modal-crit')">✕</div>
+    </div>
+    <div id="mc-summary" style="font-size:13px;color:var(--text2);margin-bottom:16px"></div>
+    <button class="btn btn-primary" style="width:100%;margin-bottom:16px" onclick="openEvidenceEditor(currentCrit,null)">➕ إضافة شاهد جديد</button>
+    <div id="mc-list"></div>
+  </div>
+</div>
+
+<!-- Modal: منشئ الشاهد الذكي -->
+<div class="modal-overlay" id="modal-ev">
+  <div class="modal wide">
+    <div class="modal-header">
+      <div class="modal-title" id="me-title">شاهد جديد</div>
+      <div class="modal-close" onclick="closeModal('modal-ev')">✕</div>
+    </div>
+    <div id="me-alert" class="hidden"></div>
+    <div style="font-size:12.5px;color:var(--text3);margin-bottom:14px" id="me-crit-label"></div>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">عنوان الشاهد *</label>
+      <input type="text" class="form-input" id="me-title-in" placeholder="مثال: تحليل نتائج اختبار الوحدة الأولى">
+      <div class="tpl-chips" id="me-tpls"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">وصف مختصر</label>
+      <textarea class="form-input" id="me-desc" rows="2" placeholder="اشرح الشاهد باختصار"></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">التاريخ</label>
+        <input type="date" class="form-input" id="me-date">
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">نوع الشاهد</label>
+        <select class="form-input" id="me-type" onchange="onTypeChange()"></select>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:12px" id="me-file-group">
+      <label class="form-label">المرفق (صورة/PDF/Word/Excel)</label>
+      <input type="file" class="form-input" id="me-file" accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx,.xls,.xlsx">
+      <div style="font-size:11.5px;color:var(--text3);margin-top:6px">يُضغط تلقائياً للصور قبل الرفع. الحد 15 ميجابايت.</div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px" id="me-link-group">
+      <label class="form-label">رابط الشاهد</label>
+      <input type="url" class="form-input" id="me-link" placeholder="https://...">
+    </div>
+    <div id="me-current" style="font-size:12px;color:var(--text2);margin-bottom:12px"></div>
+
+    <div class="form-group" style="margin-bottom:16px">
+      <label class="form-label">أثر الشاهد على التعلم أو الأداء</label>
+      <textarea class="form-input" id="me-impact" rows="2" placeholder="كيف انعكس هذا الشاهد على تعلّم الطلاب أو أدائك؟"></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-secondary" style="flex:1" onclick="saveEvidence('draft')">💾 حفظ كمسودة</button>
+      <button class="btn btn-primary" style="flex:1" onclick="saveEvidence('submitted')">📤 إرسال للمراجعة</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/supabase-config.js"></script>
+<script src="js/cloud-db.js"></script>
+<script src="js/portfolio-criteria.js"></script>
+<script src="js/app.js"></script>
+<script>
+const teacher = checkAuth();
+document.getElementById('sidebar-container').innerHTML = getSidebar('portfolio');
+
+let evidences = [];      // شواهد هذا المعلم
+let currentCrit = null;  // المعيار المفتوح حالياً
+let editingId = null;    // معرّف الشاهد قيد التعديل
+let pendingFile = null;
+
+// تعبئة قائمة الأنواع
+document.getElementById('me-type').innerHTML =
+  EVIDENCE_TYPES.map(t => `<option value="${t.key}">${t.icon} ${t.label}</option>`).join('');
+
+function loadLocal() {
+  evidences = getTeacherEvidences(teacher.id || 1);
+}
+
+async function syncFromCloud() {
+  if (!window.cloudDB || !cloudDB.isEnabled()) return;
+  try {
+    const rows = await cloudDB.listEvidencesByTeacher(teacher.id || 1);
+    if (!Array.isArray(rows)) return;
+    const all = getAllEvidences().filter(e => Number(e.teacherId) !== Number(teacher.id || 1));
+    const mapped = rows.map(r => ({
+      id: r.id, teacherId: r.teacher_id, schoolId: r.school_id, criterionId: r.criterion_id,
+      title: r.title, description: r.description, evidenceDate: r.evidence_date,
+      evidenceType: r.evidence_type, fileUrl: r.file_url, storagePath: r.storage_path,
+      impactNote: r.impact_note, status: r.status, managerNote: r.manager_note,
+      reviewedBy: r.reviewed_by, reviewedAt: r.reviewed_at,
+      createdAt: r.created_at, updatedAt: r.updated_at
+    }));
+    saveAllEvidences([...all, ...mapped]);
+    loadLocal();
+    render();
+  } catch (e) { console.warn('sync evidences failed', e); }
+}
+
+function coverageClass(pct){ return pct>=80?'pf-green':pct>=50?'pf-teal':pct>=25?'pf-gold':'pf-red'; }
+
+function render() {
+  // ملخص علوي
+  const pct = portfolioCompletion(evidences);
+  document.getElementById('sum-pct').textContent = pct + '%';
+  document.getElementById('sum-bar').style.width = pct + '%';
+  document.getElementById('sum-bar').className = 'progress-fill ' + coverageClass(pct);
+  const tot = statusTotals(evidences);
+  document.getElementById('sum-chips').innerHTML = EVIDENCE_STATUS.map(s =>
+    `<span class="cnt-chip">${s.icon} ${s.label}: <strong>${tot[s.key]||0}</strong></span>`).join('');
+
+  // بطاقات المعايير
+  document.getElementById('crit-grid').innerHTML = PERFORMANCE_CRITERIA.map(c => {
+    const st = criterionStats(evidences, c.id);
+    return `<div class="crit-card" onclick="openCriterion(${c.id})">
+      <div class="crit-top">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div class="crit-num">${c.order}</div>
+          <div class="crit-title">${c.title}</div>
+        </div>
+        <span class="crit-weight">${c.weight}%</span>
+      </div>
+      <div class="crit-cov">
+        <span style="color:var(--text3)">تغطية الشواهد</span>
+        <strong>${st.coveragePct}%</strong>
+      </div>
+      <div class="progress-bar"><div class="progress-fill ${coverageClass(st.coveragePct)}" style="width:${st.coveragePct}%"></div></div>
+      <div class="crit-counts">
+        <span class="cnt-chip" style="color:#047857">✅ معتمد ${st.approved}</span>
+        <span class="cnt-chip">📤 مرسل ${st.submitted}</span>
+        <span class="cnt-chip">✏️ تعديل ${st.needs_edit}</span>
+        <span class="cnt-chip">📝 مسودة ${st.draft}</span>
+        ${st.rejected?`<span class="cnt-chip" style="color:#DC2626">❌ مرفوض ${st.rejected}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openCriterion(id) {
+  currentCrit = id;
+  const c = criterionById(id);
+  const st = criterionStats(evidences, id);
+  document.getElementById('mc-title').textContent = `${c.order}. ${c.title} (${c.weight}%)`;
+  document.getElementById('mc-summary').innerHTML =
+    `تغطية الشواهد: <strong>${st.coveragePct}%</strong> — العدد ${st.parts.count}/70 • التنوّع ${st.parts.diversity}/20 • الاكتمال ${st.parts.completeness}/10.
+     مطلوب ${st.target} شواهد معتمدة على الأقل للتغطية الكاملة من ناحية العدد.`;
+  renderCritList();
+  openModal('modal-crit');
+}
+
+function renderCritList() {
+  const list = evidences.filter(e => Number(e.criterionId) === Number(currentCrit))
+    .sort((a,b)=> new Date(b.createdAt||0) - new Date(a.createdAt||0));
+  const box = document.getElementById('mc-list');
+  if (!list.length) {
+    box.innerHTML = `<div class="empty-state"><div class="empty-icon">🗂️</div><p>لا توجد شواهد بعد لهذا المعيار</p><small>اضغط "إضافة شاهد جديد" للبدء</small></div>`;
+    return;
+  }
+  box.innerHTML = list.map(e => {
+    const tm = evidenceTypeMeta(e.evidenceType), sm = evidenceStatusMeta(e.status);
+    const editable = e.status === 'draft' || e.status === 'needs_edit';
+    return `<div class="ev-item">
+      <div class="ev-head">
+        <div>
+          <div class="ev-title">${tm.icon} ${e.title}</div>
+          <div class="ev-meta">
+            <span>${tm.label}</span>
+            ${e.evidenceDate?`<span>📅 ${e.evidenceDate}</span>`:''}
+            ${e.fileUrl?`<a href="${e.fileUrl}" target="_blank" style="color:var(--c2)">🔗 عرض المرفق</a>`:''}
+          </div>
+        </div>
+        <span class="badge ${sm.badge}">${sm.icon} ${sm.label}</span>
+      </div>
+      ${e.description?`<div style="font-size:13px;color:var(--text2);margin-top:8px">${e.description}</div>`:''}
+      ${e.impactNote?`<div class="ev-impact">📈 الأثر: ${e.impactNote}</div>`:''}
+      ${e.managerNote?`<div class="ev-note">🏫 ملاحظة المدير: ${e.managerNote}</div>`:''}
+      <div class="ev-actions">
+        ${editable?`<button class="btn-sm btn-sm-primary" onclick="openEvidenceEditor(${currentCrit},${e.id})">✏️ تعديل</button>`:''}
+        ${editable?`<button class="btn-sm btn-sm-ghost" onclick="submitEvidence(${e.id})">📤 إرسال للمراجعة</button>`:''}
+        <button class="btn-sm btn-sm-danger" onclick="deleteEvidence(${e.id})">🗑️ حذف</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openEvidenceEditor(critId, evId) {
+  currentCrit = critId;
+  editingId = evId;
+  pendingFile = null;
+  const c = criterionById(critId);
+  document.getElementById('me-crit-label').innerHTML = `المعيار: <strong>${c.order}. ${c.title}</strong> (${c.weight}%)`;
+  document.getElementById('me-tpls').innerHTML = c.examples.map(x =>
+    `<span class="tpl-chip" onclick="document.getElementById('me-title-in').value='${x.replace(/'/g,"\\'")}'">${x}</span>`).join('');
+
+  const ev = evId ? evidences.find(e => e.id === evId) : null;
+  document.getElementById('me-title').textContent = ev ? 'تعديل شاهد' : 'شاهد جديد';
+  document.getElementById('me-title-in').value = ev?.title || '';
+  document.getElementById('me-desc').value = ev?.description || '';
+  document.getElementById('me-date').value = ev?.evidenceDate || new Date().toISOString().slice(0,10);
+  document.getElementById('me-type').value = ev?.evidenceType || 'image';
+  document.getElementById('me-link').value = (ev && ev.evidenceType==='link') ? (ev.fileUrl||'') : '';
+  document.getElementById('me-impact').value = ev?.impactNote || '';
+  document.getElementById('me-file').value = '';
+  document.getElementById('me-current').innerHTML = (ev && ev.fileUrl && ev.evidenceType!=='link')
+    ? `المرفق الحالي: <a href="${ev.fileUrl}" target="_blank" style="color:var(--c2)">عرض</a> — اترك حقل الملف فارغاً للإبقاء عليه.` : '';
+  onTypeChange();
+  document.getElementById('modal-ev').classList.add('open');
+}
+
+function onTypeChange() {
+  const isLink = document.getElementById('me-type').value === 'link';
+  document.getElementById('me-file-group').style.display = isLink ? 'none' : 'block';
+  document.getElementById('me-link-group').style.display = isLink ? 'block' : 'none';
+}
+
+document.getElementById('me-file').addEventListener('change', e => { pendingFile = e.target.files[0] || null; });
+
+async function saveEvidence(targetStatus) {
+  const title = document.getElementById('me-title-in').value.trim();
+  if (!title) { showAlert('me-alert','أدخل عنوان الشاهد على الأقل','error'); return; }
+  const type = document.getElementById('me-type').value;
+  const link = document.getElementById('me-link').value.trim();
+
+  const existing = editingId ? evidences.find(e => e.id === editingId) : null;
+  const id = editingId || generateEntityId();
+  let fileUrl = existing?.fileUrl || '';
+  let storagePath = existing?.storagePath || '';
+
+  // معالجة المرفق
+  try {
+    if (type === 'link') {
+      fileUrl = link; storagePath = '';
+    } else if (pendingFile) {
+      if (window.cloudDB && cloudDB.isEnabled()) {
+        showAlert('me-alert','جارٍ رفع المرفق...','success');
+        const up = await cloudDB.uploadEvidenceFile(pendingFile, {
+          schoolId: 0, teacherId: teacher.id || 1, evidenceId: id
+        });
+        fileUrl = up.publicUrl; storagePath = up.path;
+      } else {
+        // وضع demo بدون سحابة: تخزين مؤقت كـ data URL
+        const blob = /^image\//.test(pendingFile.type) ? await cloudDBCompress(pendingFile) : pendingFile;
+        fileUrl = await fileToDataURL(blob); storagePath = '';
+      }
+    }
+  } catch (err) {
+    showAlert('me-alert','تعذّر رفع المرفق: ' + err.message,'error'); return;
+  }
+
+  const now = new Date().toISOString();
+  const ev = {
+    id, teacherId: teacher.id || 1, schoolId: null, criterionId: currentCrit,
+    title, description: document.getElementById('me-desc').value.trim(),
+    evidenceDate: document.getElementById('me-date').value || null,
+    evidenceType: type, fileUrl, storagePath,
+    impactNote: document.getElementById('me-impact').value.trim(),
+    status: targetStatus,
+    managerNote: existing?.managerNote || '',
+    reviewedBy: existing?.reviewedBy || null, reviewedAt: existing?.reviewedAt || null,
+    createdAt: existing?.createdAt || now, updatedAt: now
+  };
+
+  // حفظ محلي
+  const all = getAllEvidences().filter(e => e.id !== id);
+  all.push(ev);
+  saveAllEvidences(all);
+  loadLocal();
+
+  // مزامنة سحابية (أفضل جهد)
+  if (window.cloudDB && cloudDB.isEnabled()) {
+    cloudDB.upsertEvidence(ev).catch(e => console.warn('cloud upsert failed', e));
+  }
+
+  closeModal('modal-ev');
+  renderCritList();
+  render();
+}
+
+function submitEvidence(id) {
+  const ev = evidences.find(e => e.id === id);
+  if (!ev) return;
+  ev.status = 'submitted'; ev.updatedAt = new Date().toISOString();
+  const all = getAllEvidences().map(e => e.id === id ? ev : e);
+  saveAllEvidences(all); loadLocal();
+  if (window.cloudDB && cloudDB.isEnabled()) cloudDB.upsertEvidence(ev).catch(()=>{});
+  renderCritList(); render();
+}
+
+function deleteEvidence(id) {
+  if (!confirm('حذف هذا الشاهد؟')) return;
+  saveAllEvidences(getAllEvidences().filter(e => e.id !== id));
+  loadLocal();
+  if (window.cloudDB && cloudDB.isEnabled()) cloudDB.deleteEvidence(id).catch(()=>{});
+  renderCritList(); render();
+}
+
+// أدوات مساعدة
+function fileToDataURL(file){ return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);}); }
+async function cloudDBCompress(file){ return (window.cloudDB && cloudDB.compressImage) ? cloudDB.compressImage(file) : file; }
+
+loadLocal();
+render();
+syncFromCloud();
+</script>
+</body>
+</html>
