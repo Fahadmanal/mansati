@@ -310,7 +310,7 @@ async function saveEvidence(targetStatus) {
       if (window.cloudDB && cloudDB.isEnabled()) {
         showAlert('me-alert','جارٍ رفع المرفق...','success');
         const up = await cloudDB.uploadEvidenceFile(pendingFile, {
-          schoolId: 0, teacherId: teacher.id || 1, evidenceId: id
+          schoolId: teacher.schoolId || 0, teacherId: teacher.id || 1, evidenceId: id
         });
         fileUrl = up.publicUrl; storagePath = up.path;
       } else {
@@ -325,7 +325,7 @@ async function saveEvidence(targetStatus) {
 
   const now = new Date().toISOString();
   const ev = {
-    id, teacherId: teacher.id || 1, schoolId: null, criterionId: currentCrit,
+    id, teacherId: teacher.id || 1, schoolId: teacher.schoolId || null, criterionId: currentCrit,
     title, description: document.getElementById('me-desc').value.trim(),
     evidenceDate: document.getElementById('me-date').value || null,
     evidenceType: type, fileUrl, storagePath,

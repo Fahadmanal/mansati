@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>منصتي — إنشاء حساب معلم</title>
+  <title>منصتي — إنشاء حساب جديد</title>
   <link rel="stylesheet" href="css/style.css?v=20260406">
 </head>
 <body>
@@ -15,15 +15,20 @@
   <div class="login-card anim-fadeup" style="width:460px">
     <div class="login-logo">
       <div class="login-logo-icon">م</div>
-      <h1>حساب معلم جديد</h1>
-      <p>أنشئ حسابك وابدأ بإدارة فصولك</p>
+      <h1 id="reg-h1">حساب جديد</h1>
+      <p id="reg-p">أنشئ حسابك وابدأ الآن</p>
     </div>
 
     <div id="reg-alert" class="hidden"></div>
 
+    <div class="tabs">
+      <button class="tab-btn active" id="rt-teacher" onclick="switchRole('teacher')">👨‍🏫 معلم</button>
+      <button class="tab-btn" id="rt-manager" onclick="switchRole('manager')">🏫 مدير مدرسة</button>
+    </div>
+
     <div class="form-group">
       <label class="form-label">الاسم الكامل</label>
-      <input type="text" class="form-input" id="r-name" placeholder="اسمك كما يظهر للطلاب" autocomplete="name">
+      <input type="text" class="form-input" id="r-name" placeholder="اسمك الكامل" autocomplete="name">
     </div>
     <div class="form-group">
       <label class="form-label">البريد أو اسم المستخدم</label>
@@ -33,27 +38,45 @@
       <label class="form-label">كلمة المرور</label>
       <input type="password" class="form-input" id="r-pass" placeholder="6 أحرف على الأقل" autocomplete="new-password" minlength="6">
     </div>
-    <div class="form-group">
+    <div class="form-group teacher-only">
       <label class="form-label">المادة</label>
       <input type="text" class="form-input" id="r-subject" placeholder="مثال: لغتي">
     </div>
-    <div class="form-group">
+    <div class="form-group teacher-only">
       <label class="form-label">المرحلة الدراسية</label>
       <input type="text" class="form-input" id="r-grade" placeholder="مثال: الثالث المتوسط">
     </div>
     <div class="form-group">
       <label class="form-label">المدرسة</label>
-      <input type="text" class="form-input" id="r-school" placeholder="اسم مدرستك (يظهر لمدير المدرسة في ملف الأداء)">
+      <input type="text" class="form-input" id="r-school" placeholder="اسم المدرسة (يربط المعلم بالمدير)">
+    </div>
+    <div class="form-group teacher-only">
+      <label class="form-label">المدينة (اختياري)</label>
+      <input type="text" class="form-input" id="r-city" placeholder="مثال: الرياض">
     </div>
 
-    <button type="button" class="btn-login" onclick="register()">إنشاء الحساب ✨</button>
+    <button type="button" class="btn-login" id="reg-btn" onclick="register()">إنشاء الحساب ✨</button>
     <div class="login-footer" style="margin-top:18px">
       لديك حساب؟ <a href="index.html">تسجيل الدخول</a>
     </div>
   </div>
 </div>
 
+<script src="js/supabase-config.js"></script>
+<script src="js/cloud-db.js"></script>
+<script src="js/app.js"></script>
 <script>
+let role = 'teacher';
+
+function switchRole(r) {
+  role = r;
+  document.getElementById('rt-teacher').classList.toggle('active', r === 'teacher');
+  document.getElementById('rt-manager').classList.toggle('active', r === 'manager');
+  document.querySelectorAll('.teacher-only').forEach(el => el.style.display = r === 'teacher' ? '' : 'none');
+  document.getElementById('reg-h1').textContent = r === 'teacher' ? 'حساب معلم جديد' : 'حساب مدير مدرسة';
+  document.getElementById('reg-p').textContent = r === 'teacher' ? 'أنشئ حسابك وابدأ بإدارة فصولك' : 'أنشئ حسابك لمراجعة ملفات أداء المعلمين';
+}
+
 function show(msg, type) {
   const b = document.getElementById('reg-alert');
   b.className = `alert alert-${type}`;
@@ -62,46 +85,73 @@ function show(msg, type) {
   if (type === 'success') setTimeout(() => b.classList.add('hidden'), 2500);
 }
 
-function register() {
+async function register() {
   const name = document.getElementById('r-name').value.trim();
   const email = document.getElementById('r-email').value.trim();
   const pass = document.getElementById('r-pass').value;
   const subject = document.getElementById('r-subject').value.trim();
   const grade = document.getElementById('r-grade').value.trim();
   const school = document.getElementById('r-school').value.trim();
+  const city = document.getElementById('r-city').value.trim();
 
-  if (!name || !email || !pass) {
-    show('أكمل الحقول المطلوبة', 'error');
-    return;
-  }
-  if (pass.length < 6) {
-    show('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
-    return;
+  if (!name || !email || !pass) { show('أكمل الحقول المطلوبة', 'error'); return; }
+  if (pass.length < 6) { show('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
+  if (role === 'teacher' && !school) { show('أدخل اسم المدرسة لربطك بمدير المدرسة', 'error'); return; }
+
+  const cloud = window.cloudDB && cloudDB.isEnabled();
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = true;
+
+  // منع التكرار (سحابياً أولاً ثم محلياً)
+  try {
+    if (cloud) {
+      const dupT = await cloudDB.findTeacherByUsername(email);
+      const dupM = await cloudDB.findManagerByUsername(email);
+      if (dupT || dupM) { show('هذا البريد أو الاسم مستخدم مسبقاً', 'error'); btn.disabled = false; return; }
+    }
+  } catch (e) { console.warn('dup check failed', e); }
+
+  const localList = JSON.parse(localStorage.getItem(role === 'teacher' ? 'teachers' : 'managers') || '[]');
+  if (localList.some(x => x.email === email || x.username === email)) {
+    show('هذا البريد أو الاسم مستخدم مسبقاً', 'error'); btn.disabled = false; return;
   }
 
-  let teachers = JSON.parse(localStorage.getItem('teachers') || '[]');
-  if (teachers.some(t => t.email === email || t.username === email)) {
-    show('هذا البريد أو الاسم مستخدم مسبقاً', 'error');
-    return;
+  const id = generateEntityId();
+
+  // تحديد/إنشاء المدرسة سحابياً للحصول على school_id حقيقي
+  let schoolId = null;
+  try {
+    if (cloud && school) {
+      const s = await cloudDB.findOrCreateSchool(school, city);
+      schoolId = s ? s.id : null;
+    }
+  } catch (e) { console.warn('school resolve failed', e); }
+
+  if (role === 'teacher') {
+    const teacher = {
+      id, name, email, username: email, password: pass,
+      subject: subject || 'معلم', grade: grade || '',
+      school: school || '', schoolId, points: 0
+    };
+    // Supabase أولاً
+    if (cloud) { try { await cloudDB.upsertTeacher(teacher); } catch (e) { console.warn('teacher upsert', e); } }
+    // cache محلي
+    const teachers = JSON.parse(localStorage.getItem('teachers') || '[]');
+    teachers.push(teacher);
+    localStorage.setItem('teachers', JSON.stringify(teachers));
+  } else {
+    const mgr = { id, name, email, username: email, password: pass, school: school || '', schoolId };
+    if (cloud) { try { await cloudDB.upsertManager(mgr); } catch (e) { console.warn('manager upsert', e); } }
+    const managers = JSON.parse(localStorage.getItem('managers') || '[]');
+    managers.push(mgr);
+    localStorage.setItem('managers', JSON.stringify(managers));
   }
 
-  const id = (typeof generateEntityId === 'function') ? generateEntityId() : (Date.now() * 1000 + Math.floor(Math.random() * 1000));
-  const teacher = {
-    id,
-    name,
-    email,
-    username: email,
-    password: pass,
-    subject: subject || 'معلم',
-    grade: grade || '',
-    school: school || '',
-    points: 0
-  };
-  teachers.push(teacher);
-  localStorage.setItem('teachers', JSON.stringify(teachers));
   show('تم إنشاء الحساب! جاري التوجيه…', 'success');
   setTimeout(() => { window.location.href = 'index.html'; }, 900);
 }
+
+switchRole('teacher');
 </script>
 </body>
 </html>

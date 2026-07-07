@@ -100,20 +100,43 @@ on conflict do nothing;
 create table if not exists public.schools (
   id bigint primary key,
   name text not null,
+  city text default '',
   created_at timestamptz not null default now()
 );
+alter table public.schools add column if not exists city text default '';
 
--- مديرو المدارس (دور جديد يراجع الشواهد ويعتمدها)
+-- المعلمون (المصدر الأساسي عبر الأجهزة؛ localStorage احتياط فقط)
+create table if not exists public.teachers (
+  id bigint primary key,
+  user_id bigint,
+  full_name text not null,
+  username text unique,
+  email text,
+  password text not null,             -- طريقة المصادقة الحالية للمشروع (نص)
+  subject text default '',
+  grade text default '',
+  school_id bigint references public.schools(id),
+  school_name text not null default '',  -- احتياطي مؤقت
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists teachers_school_idx on public.teachers (school_id);
+
+-- مديرو المدارس (دور يراجع الشواهد ويعتمدها)
 create table if not exists public.managers (
   id bigint primary key,
-  name text not null,
+  full_name text not null,
+  name text,                          -- توافق مع الإصدار السابق
   email text,
   username text unique,
   password text not null,
   school_id bigint references public.schools(id),
   school_name text not null default '',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
+alter table public.managers add column if not exists full_name text;
+alter table public.managers add column if not exists updated_at timestamptz not null default now();
 
 -- شواهد الأداء الوظيفي مرتبطة بأحد المعايير الـ 11
 create table if not exists public.evidences (
@@ -145,6 +168,7 @@ create index if not exists evidences_criterion_idx on public.evidences (criterio
 alter table public.criteria enable row level security;
 alter table public.criterion_templates enable row level security;
 alter table public.schools enable row level security;
+alter table public.teachers enable row level security;
 alter table public.managers enable row level security;
 alter table public.evidences enable row level security;
 
@@ -153,6 +177,8 @@ drop policy if exists "public read templates" on public.criterion_templates;
 drop policy if exists "public write templates" on public.criterion_templates;
 drop policy if exists "public read schools" on public.schools;
 drop policy if exists "public write schools" on public.schools;
+drop policy if exists "public read teachers" on public.teachers;
+drop policy if exists "public write teachers" on public.teachers;
 drop policy if exists "public read managers" on public.managers;
 drop policy if exists "public write managers" on public.managers;
 drop policy if exists "public read evidences" on public.evidences;
@@ -164,6 +190,8 @@ create policy "public read templates" on public.criterion_templates for select u
 create policy "public write templates" on public.criterion_templates for all using (true) with check (true);
 create policy "public read schools" on public.schools for select using (true);
 create policy "public write schools" on public.schools for all using (true) with check (true);
+create policy "public read teachers" on public.teachers for select using (true);
+create policy "public write teachers" on public.teachers for all using (true) with check (true);
 create policy "public read managers" on public.managers for select using (true);
 create policy "public write managers" on public.managers for all using (true) with check (true);
 create policy "public read evidences" on public.evidences for select using (true);

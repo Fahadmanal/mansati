@@ -95,7 +95,7 @@
 <script src="js/app.js"></script>
 <script>
 const manager = JSON.parse(localStorage.getItem('currentManager') || 'null');
-if (!manager) window.location.href = 'index.html';
+if (!manager) { window.location.href = 'index.html'; throw new Error('no manager session'); }
 
 let schoolTeachers = [];   // [{...teacher, evidences:[]}]
 let currentTeacher = null; // المعلم قيد المراجعة
@@ -108,12 +108,32 @@ document.getElementById('rv-crit').innerHTML =
 
 function logoutManager(){ localStorage.removeItem('currentManager'); window.location.href = 'index.html'; }
 
-function loadTeachers() {
-  const all = JSON.parse(localStorage.getItem('teachers') || '[]');
-  const mine = manager.school
-    ? all.filter(t => (t.school || '') === manager.school)
-    : all;
-  schoolTeachers = mine.map(t => ({ ...t, evidences: getTeacherEvidences(t.id) }));
+async function loadTeachers() {
+  // المصدر الأساسي: Supabase حسب school_id — localStorage احتياط فقط
+  let list = null;
+  if (window.cloudDB && cloudDB.isEnabled()) {
+    try {
+      // ضمان school_id للمدير
+      if (!manager.schoolId && manager.school) {
+        const s = await cloudDB.findOrCreateSchool(manager.school);
+        if (s) { manager.schoolId = s.id; localStorage.setItem('currentManager', JSON.stringify(manager)); }
+      }
+      if (manager.schoolId) {
+        const rows = await cloudDB.listTeachersBySchool(manager.schoolId);
+        if (Array.isArray(rows)) {
+          list = rows.map(r => ({
+            id: r.id, name: r.full_name, username: r.username, email: r.email,
+            subject: r.subject, grade: r.grade, school: r.school_name, schoolId: r.school_id
+          }));
+        }
+      }
+    } catch (e) { console.warn('cloud teachers failed', e); }
+  }
+  if (!list) {
+    const all = JSON.parse(localStorage.getItem('teachers') || '[]');
+    list = manager.school ? all.filter(t => (t.school || '') === manager.school) : all;
+  }
+  schoolTeachers = list.map(t => ({ ...t, evidences: getTeacherEvidences(t.id) }));
 }
 
 async function syncFromCloud() {
@@ -130,7 +150,7 @@ async function syncFromCloud() {
       createdAt: r.created_at, updatedAt: r.updated_at
     }));
     saveAllEvidences(mapped);
-    loadTeachers(); render();
+    await loadTeachers(); render();
   } catch (e) { console.warn('sync failed', e); }
 }
 
@@ -261,9 +281,11 @@ function reviewEvidence(id, newStatus) {
   render();
 }
 
-loadTeachers();
-render();
-syncFromCloud();
+(async function init(){
+  await loadTeachers();
+  render();
+  await syncFromCloud();
+})();
 </script>
 </body>
 </html>

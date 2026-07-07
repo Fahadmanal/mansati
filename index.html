@@ -116,6 +116,9 @@
   </div>
 </div>
 
+<script src="js/supabase-config.js"></script>
+<script src="js/cloud-db.js"></script>
+<script src="js/app.js"></script>
 <script>
 function switchTab(t){
   ['teacher','manager','student'].forEach(k=>{
@@ -136,29 +139,61 @@ function showAlert(msg,type){
   b.className=`alert alert-${type}`;b.textContent=(type==='success'?'✅ ':'❌ ')+msg;
   b.classList.remove('hidden');setTimeout(()=>b.classList.add('hidden'),3000);
 }
-function loginTeacher(){
+async function loginTeacher(){
   const u=document.getElementById('teacher-user').value.trim();
   const p=document.getElementById('teacher-pass').value.trim();
   if(!u||!p){showAlert('يرجى تعبئة جميع الحقول','error');return}
+  // Supabase أولاً (تسجيل الدخول عبر الأجهزة)
+  if(window.cloudDB && cloudDB.isEnabled()){
+    try{
+      const row=await cloudDB.findTeacherByUsername(u);
+      if(row && row.password===p){
+        const teacher={id:row.id,name:row.full_name,email:row.email||row.username,username:row.username,
+          subject:row.subject||'معلم',grade:row.grade||'',school:row.school_name||'',schoolId:row.school_id,points:0};
+        localStorage.setItem('currentTeacher',JSON.stringify(teacher));
+        showAlert('مرحباً بك! 🎉','success');
+        setTimeout(()=>window.location.href='dashboard.html',700);return;
+      }
+    }catch(e){console.warn('cloud teacher login',e);}
+  }
+  // fallback محلي / demo
   const teachers=JSON.parse(localStorage.getItem('teachers')||'[]');
   const found=teachers.find(t=>(t.email===u||t.username===u)&&t.password===p);
   if(found||(u==='demo'&&p==='123456')){
-    const teacher=found||{id:1,name:'فهد عليان العنزي',email:'demo',subject:'لغتي',grade:'الثالث المتوسط',points:0};
+    const teacher=found||{id:1,name:'فهد عليان العنزي',email:'demo',subject:'لغتي',grade:'الثالث المتوسط',school:'متوسطة الأمير سلطان',points:0};
     localStorage.setItem('currentTeacher',JSON.stringify(teacher));
     showAlert('مرحباً بك! 🎉','success');
     setTimeout(()=>window.location.href='dashboard.html',700);
   } else showAlert('بيانات الدخول غير صحيحة','error');
 }
-function loginManager(){
+async function loginManager(){
   const u=document.getElementById('manager-user').value.trim();
   const p=document.getElementById('manager-pass').value.trim();
   if(!u||!p){showAlert('يرجى تعبئة جميع الحقول','error');return}
-  const managers=JSON.parse(localStorage.getItem('managers')||'[]');
-  let found=managers.find(m=>(m.email===u||m.username===u)&&m.password===p);
-  if(!found&&u==='manager'&&p==='123456'){
-    found={id:1,name:'مدير المدرسة',email:'manager',username:'manager',school:'متوسطة الأمير سلطان'};
+  let found=null;
+  // Supabase أولاً
+  if(window.cloudDB && cloudDB.isEnabled()){
+    try{
+      const row=await cloudDB.findManagerByUsername(u);
+      if(row && row.password===p){
+        found={id:row.id,name:row.full_name||row.name,email:row.email||row.username,username:row.username,
+          school:row.school_name||'',schoolId:row.school_id};
+      }
+    }catch(e){console.warn('cloud manager login',e);}
+  }
+  // fallback محلي / demo
+  if(!found){
+    const managers=JSON.parse(localStorage.getItem('managers')||'[]');
+    found=managers.find(m=>(m.email===u||m.username===u)&&m.password===p)||null;
+    if(!found&&u==='manager'&&p==='123456'){
+      found={id:1,name:'مدير المدرسة',email:'manager',username:'manager',school:'متوسطة الأمير سلطان'};
+    }
   }
   if(found){
+    // ضمان school_id حقيقي للمدير (لقراءة معلمي مدرسته)
+    if(!found.schoolId && found.school && window.cloudDB && cloudDB.isEnabled()){
+      try{const s=await cloudDB.findOrCreateSchool(found.school); if(s) found.schoolId=s.id;}catch(e){}
+    }
     localStorage.setItem('currentManager',JSON.stringify(found));
     localStorage.removeItem('currentTeacher');
     showAlert('مرحباً بك 🏫','success');

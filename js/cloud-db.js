@@ -203,20 +203,77 @@
     return request('evidences?order=teacher_id.asc');
   }
 
+  // ===== المدارس والمعلمون والمديرون (المصدر الأساسي عبر الأجهزة) =====
+  async function findOrCreateSchool(name, city) {
+    const clean = (name || '').trim();
+    if (!clean) return null;
+    const rows = await request(`schools?name=eq.${encodeURIComponent(clean)}&limit=1`);
+    if (rows && rows[0]) return rows[0];
+    const id = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+    const created = await request('schools?on_conflict=id', {
+      method: 'POST',
+      body: JSON.stringify([{ id, name: clean, city: city || '', created_at: new Date().toISOString() }]),
+      prefer: 'resolution=merge-duplicates,return=representation'
+    });
+    return (created && created[0]) ? created[0] : { id, name: clean, city: city || '' };
+  }
+
+  async function upsertTeacher(t) {
+    const now = new Date().toISOString();
+    return request('teachers?on_conflict=id', {
+      method: 'POST',
+      body: JSON.stringify([{
+        id: Number(t.id),
+        user_id: t.userId ? Number(t.userId) : null,
+        full_name: t.name,
+        username: t.username || t.email || '',
+        email: t.email || '',
+        password: t.password || '',
+        subject: t.subject || '',
+        grade: t.grade || '',
+        school_id: t.schoolId ? Number(t.schoolId) : null,
+        school_name: t.school || '',
+        created_at: t.createdAt || now,
+        updated_at: now
+      }]),
+      prefer: 'resolution=merge-duplicates,return=representation'
+    });
+  }
+
+  async function findTeacherByUsername(username) {
+    const u = encodeURIComponent((username || '').trim());
+    const rows = await request(`teachers?or=(username.eq.${u},email.eq.${u})&limit=1`);
+    return rows && rows[0] ? rows[0] : null;
+  }
+
+  async function listTeachersBySchool(schoolId) {
+    return request(`teachers?school_id=eq.${Number(schoolId)}&order=full_name.asc`);
+  }
+
   async function upsertManager(mgr) {
+    const now = new Date().toISOString();
     return request('managers?on_conflict=id', {
       method: 'POST',
       body: JSON.stringify([{
         id: Number(mgr.id),
+        full_name: mgr.name,
         name: mgr.name,
         email: mgr.email || '',
         username: mgr.username || '',
         password: mgr.password,
+        school_id: mgr.schoolId ? Number(mgr.schoolId) : null,
         school_name: mgr.school || '',
-        created_at: mgr.createdAt || new Date().toISOString()
+        created_at: mgr.createdAt || now,
+        updated_at: now
       }]),
       prefer: 'resolution=merge-duplicates,return=representation'
     });
+  }
+
+  async function findManagerByUsername(username) {
+    const u = encodeURIComponent((username || '').trim());
+    const rows = await request(`managers?or=(username.eq.${u},email.eq.${u})&limit=1`);
+    return rows && rows[0] ? rows[0] : null;
   }
 
   global.cloudDB = {
@@ -235,6 +292,11 @@
     listEvidencesByTeacher,
     listAllEvidences,
     upsertManager,
+    findOrCreateSchool,
+    upsertTeacher,
+    findTeacherByUsername,
+    listTeachersBySchool,
+    findManagerByUsername,
     uploadEvidenceFile,
     compressImage
   };
